@@ -2,26 +2,20 @@
 __pycache__/
 *.py[cod]
 *.pyo
-..env
-.env.local
-.env.production
-.env
-.env.local
-.env.production
-env/
 *.egg-info/
 dist/
 build/
 .eggs/
 
+# Virtual environments
+venv/
+.venv/
+env/
+
 # Jupyter
 .ipynb_checkpoints/
-*.ipynb_checkpoints
 
 # Environment / secrets
-.env
-.env.local
-.env.production
 .env
 .env.local
 .env.production
