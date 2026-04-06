@@ -2,8 +2,12 @@
 __pycache__/
 *.py[cod]
 *.pyo
-.venv/
-venv/
+..env
+.env.local
+.env.production
+.env
+.env.local
+.env.production
 env/
 *.egg-info/
 dist/
@@ -16,7 +20,11 @@ build/
 
 # Environment / secrets
 .env
-.env.*
+.env.local
+.env.production
+.env
+.env.local
+.env.production
 *credentials*
 *secrets*
 
