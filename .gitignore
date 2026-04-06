@@ -1,0 +1,52 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Environment / secrets
+.env
+.env.*
+*credentials*
+*secrets*
+
+# ML artifacts
+*.pt
+*.pth
+*.onnx
+*.bin
+*.safetensors
+checkpoints/
+mlruns/
+mlflow/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Helm
+*.tgz
+
+# Results (committed manually when ready)
+p3-spark-benchmark/results/*.csv
