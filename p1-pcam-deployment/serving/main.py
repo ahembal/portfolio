@@ -45,7 +45,15 @@ import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 from fastapi import FastAPI, File, HTTPException, UploadFile
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
+from prometheus_client import (
+    Counter,
+    Histogram,
+    Info,
+    generate_latest,
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "infra" / "ceph-rgw"))
 from boto3_config import RGWConfig, get_s3_client
@@ -55,6 +63,54 @@ logging.basicConfig(
     format="%(asctime)s %(levelname)s %(message)s",
 )
 log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Prometheus metrics
+# ---------------------------------------------------------------------------
+# Why prometheus_client over a custom /metrics JSON endpoint?
+# Prometheus has a standard text exposition format that Prometheus server
+# scrapes natively. prometheus_client generates this format automatically —
+# no custom serialisation, no schema design, compatible with all Prometheus
+# tooling (Grafana dashboards, alerting rules, PodMonitor CRDs).
+#
+# Three metric types used here:
+#
+# Counter — monotonically increasing. Used for request counts and errors.
+#   Never reset to zero (survives pod restarts gracefully in Prometheus).
+#   Prometheus rate() function computes per-second rates from counters.
+#
+# Histogram — tracks the distribution of a value (latency here).
+#   Automatically creates _count, _sum, and _bucket time series.
+#   Prometheus histogram_quantile() derives p50/p95/p99 from buckets.
+#   Buckets are tuned for inference latency: ResNet-18 on CPU ~10–200 ms,
+#   cold start (model load) up to a few seconds — ignored by /predict buckets.
+#
+# Info — static key-value metadata exposed as a gauge with value=1.
+#   Used here to expose model version and device — shows up in Grafana as
+#   a label set, not a time series. Useful for correlating metric changes
+#   with deployments.
+
+REQUEST_COUNT = Counter(
+    "pcam_requests_total",
+    "Total number of requests by endpoint and HTTP status",
+    ["endpoint", "status"],
+)
+
+REQUEST_LATENCY = Histogram(
+    "pcam_request_latency_ms",
+    "Request latency in milliseconds",
+    ["endpoint"],
+    # Buckets tuned for CPU inference: p50 ~20 ms, p99 ~200 ms.
+    # Wide upper buckets catch occasional slow requests without distorting
+    # the histogram (Prometheus counts all observations above the last bucket
+    # in the +Inf bucket automatically).
+    buckets=[5, 10, 25, 50, 100, 200, 500, 1000, 2000],
+)
+
+MODEL_INFO = Info(
+    "pcam_model",
+    "Static metadata about the loaded model",
+)
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -219,6 +275,14 @@ async def lifespan(app: FastAPI):
     app_state["model"]  = model
     app_state["cfg"]    = cfg
     app_state["device"] = cfg.resolved_device
+    # Expose static model metadata as a Prometheus Info metric.
+    # This shows up in Grafana as a label set on the pcam_model_info series —
+    # useful for correlating AUC/latency shifts with model version changes.
+    MODEL_INFO.info({
+        "model_key": cfg.model_key,
+        "bucket":    cfg.bucket,
+        "device":    str(cfg.resolved_device),
+    })
     log.info("Model ready — service is up")
     yield
     log.info("Service shutting down")
@@ -248,7 +312,9 @@ async def health():
     Returns 503 if the model failed to load at startup.
     """
     if "model" not in app_state:
+        REQUEST_COUNT.labels(endpoint="/health", status="503").inc()
         raise HTTPException(status_code=503, detail="Model not loaded")
+    REQUEST_COUNT.labels(endpoint="/health", status="200").inc()
     return {"status": "ok", "device": str(app_state["device"])}
 
 
@@ -271,6 +337,7 @@ async def predict(file: UploadFile = File(...)):
         503: if the model is not loaded
     """
     if "model" not in app_state:
+        REQUEST_COUNT.labels(endpoint="/predict", status="503").inc()
         raise HTTPException(status_code=503, detail="Model not loaded")
 
     image_bytes = await file.read()
@@ -278,6 +345,7 @@ async def predict(file: UploadFile = File(...)):
     try:
         tensor = preprocess(image_bytes)
     except ValueError as e:
+        REQUEST_COUNT.labels(endpoint="/predict", status="422").inc()
         raise HTTPException(status_code=422, detail=str(e))
 
     model  = app_state["model"]
@@ -289,6 +357,11 @@ async def predict(file: UploadFile = File(...)):
         logits = model(tensor)
     latency_ms = (time.perf_counter() - t0) * 1000
 
+    # Record inference latency in the histogram. Prometheus will compute
+    # p50/p95/p99 from these observations via histogram_quantile() in Grafana.
+    REQUEST_LATENCY.labels(endpoint="/predict").observe(latency_ms)
+    REQUEST_COUNT.labels(endpoint="/predict", status="200").inc()
+
     probs      = torch.softmax(logits, dim=1)[0]
     class_idx  = int(probs.argmax())
     confidence = float(probs[class_idx])
@@ -298,3 +371,23 @@ async def predict(file: UploadFile = File(...)):
         "confidence": round(confidence, 4),
         "latency_ms": round(latency_ms, 2),
     })
+
+
+@app.get("/metrics")
+async def metrics():
+    """
+    Prometheus metrics endpoint.
+
+    Exposes counters and histograms in the Prometheus text exposition format.
+    Prometheus server scrapes this endpoint on a configured interval (default 15 s).
+
+    Metrics exposed:
+      pcam_requests_total{endpoint, status}   — request count by endpoint + HTTP status
+      pcam_request_latency_ms{endpoint}       — inference latency histogram (ms)
+      pcam_model_info{model_key, bucket, ...} — static model metadata (value=1)
+
+    In Grafana:
+      rate(pcam_requests_total[1m])                    → requests/sec
+      histogram_quantile(0.95, pcam_request_latency_ms) → p95 latency
+    """
+    return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)
