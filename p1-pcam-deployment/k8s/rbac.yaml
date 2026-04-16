@@ -1,0 +1,122 @@
+# k8s/rbac.yaml — least-privilege RBAC for the pcam-inference workload.
+#
+# Why a dedicated ServiceAccount instead of using the default SA?
+# The default ServiceAccount in every namespace has no RBAC bindings by default,
+# but it does get an auto-mounted token that can be used to query the API server.
+# In a GitOps setup, ArgoCD manages resources on behalf of a service account.
+# Creating a named SA per application makes permissions explicit and auditable —
+# you can see exactly what pcam-inference is allowed to do, and nothing more.
+#
+# Why not cluster-admin for ArgoCD?
+# ArgoCD is often installed with cluster-admin for convenience. That gives it
+# the ability to create, modify, or delete anything in the cluster. For a
+# portfolio homelab this is unnecessary — the pcam-inference app only needs
+# to manage resources in its own namespace. Scoping to a Role (namespaced)
+# instead of ClusterRole limits the blast radius of a compromised ArgoCD.
+#
+# Apply before installing the Helm chart:
+#   kubectl apply -f k8s/rbac.yaml
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pcam
+  labels:
+    app.kubernetes.io/managed-by: kubectl
+
+---
+# ServiceAccount used by the pcam-inference pods themselves.
+# Pods reference this SA via spec.serviceAccountName in the Deployment.
+# Keeping it separate from the ArgoCD SA below means pod permissions and
+# CD permissions can be tightened independently.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: pcam-inference
+  namespace: pcam
+  labels:
+    app.kubernetes.io/name: pcam-inference
+    app.kubernetes.io/component: serviceaccount
+automountServiceAccountToken: false
+# automountServiceAccountToken: false — the inference service never queries
+# the K8s API, so it does not need a token. Disabling the auto-mount removes
+# the token from the pod filesystem entirely, shrinking the attack surface.
+
+---
+# ServiceAccount used by ArgoCD to manage resources in the pcam namespace.
+# ArgoCD impersonates this SA when applying manifests. By binding it only
+# to the Role below, ArgoCD can only touch resources in this namespace.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: argocd-pcam-manager
+  namespace: pcam
+  labels:
+    app.kubernetes.io/name: pcam-inference
+    app.kubernetes.io/component: argocd-serviceaccount
+
+---
+# Role — namespaced, so it can only grant permissions within pcam.
+# Grants the minimum set of verbs on the minimum set of resource types
+# needed for ArgoCD to reconcile the Helm chart.
+#
+# Resource types included:
+#   deployments, services, configmaps — core chart resources
+#   horizontalpodautoscalers          — HPA managed by the chart
+#   ingresses                         — Ingress template in the chart
+#   replicasets, pods                 — read-only, for ArgoCD health checks
+#
+# Verbs NOT granted:
+#   escalate, bind — cannot grant more permissions than the SA itself has
+#   deletecollection — bulk deletes; not needed for rolling updates
+#   impersonate — cannot act as other users/SAs
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argocd-pcam-manager
+  namespace: pcam
+  labels:
+    app.kubernetes.io/name: pcam-inference
+    app.kubernetes.io/component: rbac
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments", "replicasets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: [""]
+    resources: ["services", "configmaps", "serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+
+  - apiGroups: ["autoscaling"]
+    resources: ["horizontalpodautoscalers"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# RoleBinding — binds the Role to the ArgoCD SA.
+# This is the object that actually grants the permissions.
+# Role + RoleBinding are separate so the same Role could be reused
+# for other SAs (e.g. a CI pipeline SA) without duplication.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argocd-pcam-manager
+  namespace: pcam
+  labels:
+    app.kubernetes.io/name: pcam-inference
+    app.kubernetes.io/component: rbac
+subjects:
+  - kind: ServiceAccount
+    name: argocd-pcam-manager
+    namespace: pcam
+roleRef:
+  kind: Role
+  name: argocd-pcam-manager
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,140 @@
+# CI pipeline for p1-pcam-deployment
+#
+# What this does, in order:
+#   1. lint-and-test  — catches code errors before wasting time on a Docker build
+#   2. build-and-push — builds the image and pushes to GHCR
+#   3. update-tag     — writes the new image SHA into values.yaml and commits it
+#                       back, so ArgoCD detects drift and syncs the cluster
+#
+# Why path filters?
+# The portfolio repo has multiple projects. We only trigger this pipeline when
+# p1 files change — not on every commit to every project.
+
+name: p1 — PCam inference
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'p1-pcam-deployment/**'
+      - '.github/workflows/ci.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'p1-pcam-deployment/**'
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/pcam-inference
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: lint + test
+  # Runs on every push and PR. Fails fast — no point building an image if the
+  # code doesn't pass basic checks. Uses pip cache so installs are fast after
+  # the first run.
+  # ---------------------------------------------------------------------------
+  lint-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        # Fetches the full repo so we can access serving/main.py and tests/
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: p1-pcam-deployment/serving/requirements.txt
+
+      - name: Install dependencies
+        # Only install what tests and linting need — not the full ML stack.
+        # torch/torchvision are mocked in tests so we don't need GPU here.
+        run: |
+          pip install -q \
+            fastapi httpx pytest pytest-cov \
+            pillow numpy \
+            ruff
+        working-directory: p1-pcam-deployment
+
+      - name: Lint — ruff
+        # ruff checks style + imports in one pass (replaces flake8 + isort).
+        # --select E,F,I = pycodestyle errors, pyflakes, import order.
+        run: ruff check --select E,F,I serving/main.py train/train.py
+        working-directory: p1-pcam-deployment
+
+      - name: Test — pytest
+        # Tests mock out the model and S3 client so no GPU or real RGW needed.
+        # --cov produces a coverage report shown in the Actions summary.
+        run: pytest tests/ -v --tb=short --cov=serving --cov-report=term-missing
+        working-directory: p1-pcam-deployment
+
+  # ---------------------------------------------------------------------------
+  # Job 2: build and push image
+  # Only runs after lint-and-test passes (needs:). Only pushes on main branch
+  # — PRs build but don't push, so reviewers can verify the build is valid.
+  #
+  # Why build context = repo root?
+  # The Dockerfile copies infra/ceph-rgw/boto3_config.py which lives outside
+  # the serving/ directory. The build context must include it.
+  #
+  # Why Docker layer cache (type=gha)?
+  # GitHub Actions cache persists between runs. The pip install layer (~1.5 GB)
+  # is reused if requirements.txt hasn't changed — cuts build time from ~8 min
+  # to ~2 min on subsequent runs.
+  # ---------------------------------------------------------------------------
+  build-and-push:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write   # required to push to GHCR
+      contents: write   # required to commit the tag back to values.yaml
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        # GITHUB_TOKEN is automatically provided by Actions — no manual secret
+        # needed. It has write access to packages in this repo's org/user scope.
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        # Buildx enables BuildKit, which is required for multi-stage builds and
+        # the GitHub Actions layer cache (type=gha).
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          # context is repo root — gives Dockerfile access to infra/
+          context: .
+          file: p1-pcam-deployment/serving/Dockerfile
+          # push=true only on main; PRs run the build but don't publish
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ env.IMAGE }}:${{ github.sha }}
+            ${{ env.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Update image tag in values.yaml
+        # Write the new SHA into values.yaml and commit it back to main.
+        # ArgoCD watches this file — when it changes, ArgoCD detects drift
+        # and runs `helm upgrade` on the cluster automatically.
+        # Short SHA (7 chars) matches `git log --oneline` format.
+        if: github.ref == 'refs/heads/main'
+        run: |
+          SHORT_SHA="${GITHUB_SHA:0:7}"
+          sed -i "s/^  tag: .*/  tag: \"${SHORT_SHA}\"/" \
+            p1-pcam-deployment/helm/pcam-inference/values.yaml
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add p1-pcam-deployment/helm/pcam-inference/values.yaml
+          git diff --staged --quiet || git commit -m "ci(p1): update image tag to ${SHORT_SHA}"
+          git push
