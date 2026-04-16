@@ -1,0 +1,31 @@
+# service.yaml — stable network endpoint for the inference pods.
+#
+# A Service gives the pod set a single DNS name and IP regardless of how many
+# replicas are running or which nodes they land on. Without it, callers would
+# need to track individual pod IPs, which change on every reschedule.
+#
+# type: ClusterIP (set in values.yaml) keeps the service cluster-internal.
+# External access is via `kubectl port-forward svc/<name> 8080:80` for demos.
+# If an Ingress were needed for production we'd add it as a separate template,
+# but for a homelab portfolio demo port-forwarding is sufficient and simpler.
+#
+# The selector must match selectorLabels exactly — that's what routes traffic
+# from the Service to the correct pods. It must stay in sync with the
+# Deployment's pod template labels.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "pcam-inference.fullname" . }}
+  labels:
+    {{- include "pcam-inference.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.service.type }}
+  selector:
+    {{- include "pcam-inference.selectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      protocol: TCP
+      # port: what callers inside the cluster connect to (80 — standard HTTP)
+      port: {{ .Values.service.port }}
+      # targetPort: what the container actually listens on (8080 per Dockerfile)
+      targetPort: {{ .Values.service.targetPort }}

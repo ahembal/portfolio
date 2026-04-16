@@ -1,0 +1,46 @@
+# hpa.yaml — Horizontal Pod Autoscaler for the inference service.
+#
+# HPA watches the CPU utilization of the Deployment's pods and adds or
+# removes replicas to keep average utilization near the target percentage.
+#
+# Why CPU as the scaling metric here?
+# The inference workload is CPU-bound on this homelab cluster (no GPU).
+# Each /predict request spends ~20 ms on model inference, which is pure
+# compute. CPU utilization is therefore a reliable proxy for request rate,
+# making it a practical scaling signal.
+#
+# The `{{- if .Values.hpa.enabled }}` guard lets you disable HPA for
+# simple single-node testing by setting hpa.enabled: false in values.
+# When HPA is enabled, the Deployment omits the `replicas` field (see
+# deployment.yaml) to avoid the two fighting each other on `helm upgrade`.
+#
+# To observe HPA in action during the load test:
+#   kubectl get hpa -w
+# You should see REPLICAS increase as locust ramps up request rate.
+{{- if .Values.hpa.enabled }}
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "pcam-inference.fullname" . }}
+  labels:
+    {{- include "pcam-inference.labels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "pcam-inference.fullname" . }}
+
+  minReplicas: {{ .Values.hpa.minReplicas }}
+  maxReplicas: {{ .Values.hpa.maxReplicas }}
+
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          # Utilization is expressed as a percentage of the pod's CPU
+          # *request* (not limit). At 60% of 250m = 150m millicores, HPA
+          # adds a replica. This gives ~40% headroom before latency degrades.
+          type: Utilization
+          averageUtilization: {{ .Values.hpa.targetCPUUtilizationPercentage }}
+{{- end }}

@@ -1,0 +1,17 @@
+# Chart.yaml — Helm chart metadata
+#
+# apiVersion: v2 is required for Helm 3. v1 charts are Helm 2 legacy.
+# type: application means this chart installs a running workload.
+#   (The alternative, "library", is for shared helper templates only.)
+# version bumps on chart changes; appVersion tracks the container image tag.
+#   Keeping them separate lets you update chart config without rebuilding
+#   the image, and vice versa.
+apiVersion: v2
+name: pcam-inference
+description: >
+  PCam histopathology binary classifier — FastAPI serving layer.
+  Loads a ResNet-18 model from Ceph RGW at startup and exposes
+  a /predict endpoint for tumour/normal classification.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

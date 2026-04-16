@@ -1,0 +1,69 @@
+# ingress.yaml — exposes the service via Nginx Ingress Controller.
+#
+# Why Ingress instead of kubectl port-forward?
+# port-forward is a development shortcut — it tunnels traffic through the
+# API server and breaks if the pod restarts. Ingress is the production path:
+# a stable hostname, handled by the Nginx Ingress Controller running in the
+# cluster, independent of any individual pod or kubectl session.
+#
+# The entire resource is gated on ingress.enabled so the chart stays usable
+# in environments without an Ingress Controller (CI, local kind clusters).
+# Set ingress.enabled=true and ingress.host=<hostname> at deploy time.
+
+{{- if .Values.ingress.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "pcam-inference.fullname" . }}
+  labels:
+    {{- include "pcam-inference.labels" . | nindent 4 }}
+  annotations:
+    # Declares which Ingress Controller should handle this resource.
+    # Required when multiple controllers are installed — without it, all
+    # controllers may fight over the same Ingress object.
+    kubernetes.io/ingress.class: nginx
+
+    # Increase proxy read timeout for inference requests.
+    # Default Nginx timeout is 60 s. ResNet-18 inference on CPU takes ~20 ms,
+    # but model loading on cold start can take a few seconds. 120 s gives
+    # plenty of headroom without exposing the service to slow-loris attacks.
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "120"
+
+    # Limit request body to 2 MB — a 96×96 JPEG patch is ~15 KB, so 2 MB
+    # allows batch uploads while rejecting obviously oversized payloads.
+    nginx.ingress.kubernetes.io/proxy-body-size: "2m"
+
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                # Route to the ClusterIP Service, not directly to pods.
+                # The Service provides stable DNS + load balancing across pods
+                # as HPA scales replicas up and down.
+                name: {{ include "pcam-inference.fullname" . }}
+                port:
+                  # Reference the named port defined in service.yaml.
+                  # Named port references survive port number changes —
+                  # more resilient than hardcoding 80.
+                  name: http
+
+  {{- if .Values.ingress.tls.enabled }}
+  # TLS termination at the Ingress — traffic inside the cluster stays HTTP.
+  # cert-manager (if installed) can provision the certificate automatically
+  # using the cert-manager.io/cluster-issuer annotation. Without cert-manager,
+  # create the secret manually:
+  #   kubectl create secret tls pcam-tls --cert=tls.crt --key=tls.key
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+{{- end }}

@@ -1,0 +1,130 @@
+# values.yaml — default configuration for the pcam-inference chart
+#
+# Override any value at deploy time with:
+#   helm upgrade --install pcam ./helm/pcam-inference -f my-overrides.yaml
+# or with --set key=value flags.
+#
+# Secrets (RGW credentials) are intentionally NOT stored here.
+# They live in a K8s Secret created out-of-band and referenced by name.
+# This prevents credentials from appearing in git history or Helm release
+# metadata (which is stored in-cluster as a ConfigMap/Secret).
+
+# ---------------------------------------------------------------------------
+# Image
+# ---------------------------------------------------------------------------
+image:
+  # Registry path — CI pushes to GHCR on every merge to main.
+  repository: ghcr.io/ahembal/pcam-inference
+  # tag is updated automatically by the CI pipeline (ci.yml) after each
+  # successful build. ArgoCD detects the change and syncs the cluster.
+  # Set manually to "latest" for local dev / first deploy.
+  tag: "latest"
+  # pullPolicy: Always ensures the cluster pulls the new tag on every rollout,
+  # even if the tag name hasn't changed (e.g. "latest"). Use IfNotPresent only
+  # when tags are immutable SHAs.
+  pullPolicy: Always
+
+# ---------------------------------------------------------------------------
+# Replica count
+# ---------------------------------------------------------------------------
+# Starting replica count. HPA will scale this up under load.
+# Set to 1 for initial deploy — we want to observe the scale-up event.
+replicaCount: 1
+
+# ---------------------------------------------------------------------------
+# Service
+# ---------------------------------------------------------------------------
+service:
+  # ClusterIP keeps the service internal to the cluster.
+  # For external access we use `kubectl port-forward` during testing, which
+  # is simpler than an Ingress for a homelab demo.
+  type: ClusterIP
+  port: 80
+  # targetPort must match EXPOSE / CMD port in the Dockerfile (8080).
+  targetPort: 8080
+
+# ---------------------------------------------------------------------------
+# Model source — non-sensitive config, safe to store in values
+# ---------------------------------------------------------------------------
+model:
+  # RGW endpoint on the local network. Pods on the K8s cluster can reach
+  # the Ceph node directly — no need for a K8s Service in front of it.
+  rgwEndpoint: "http://192.168.1.16"
+  # S3 bucket that holds trained artifacts
+  bucket: "ml-artifacts"
+  # Key path inside the bucket. Override at deploy time to switch model
+  # versions without changing any other config.
+  key: "pcam/kaggle-001/best_model.pt"
+
+# ---------------------------------------------------------------------------
+# Secret reference — credentials are stored in a K8s Secret, not here
+# ---------------------------------------------------------------------------
+# Create the secret before installing the chart:
+#   kubectl create secret generic pcam-rgw-credentials \
+#     --from-literal=access-key=<KEY> \
+#     --from-literal=secret-key=<SECRET>
+credentialsSecret: "pcam-rgw-credentials"
+
+# ---------------------------------------------------------------------------
+# Resources
+# ---------------------------------------------------------------------------
+# CPU inference on a homelab worker. No GPU available, so we set conservative
+# limits. The model is ~45 MB and runs in ~20 ms per image on CPU.
+# request < limit to allow bursting during load tests without OOMKill.
+resources:
+  requests:
+    cpu: "250m"
+    memory: "512Mi"
+  limits:
+    cpu: "1000m"
+    memory: "1Gi"
+
+# ---------------------------------------------------------------------------
+# Ingress
+# ---------------------------------------------------------------------------
+# Disabled by default — enable at deploy time with:
+#   helm upgrade --install pcam ./helm/pcam-inference \
+#     --set ingress.enabled=true \
+#     --set ingress.host=pcam.homelab.local
+#
+# Requires an Nginx Ingress Controller running in the cluster.
+# Install with: helm install ingress-nginx ingress-nginx/ingress-nginx
+ingress:
+  enabled: false
+  # Hostname the Ingress Controller will route. Must resolve to the node IP
+  # (add to /etc/hosts for homelab: 192.168.1.184 pcam.homelab.local).
+  host: pcam.homelab.local
+  # Extra annotations merged into the Ingress object — use to add
+  # cert-manager issuer, rate limiting, auth, etc.
+  annotations: {}
+  tls:
+    # Set to true and provide a secret name to enable HTTPS termination.
+    # Without cert-manager, create the secret manually before enabling.
+    enabled: false
+    secretName: pcam-tls
+
+# ---------------------------------------------------------------------------
+# Horizontal Pod Autoscaler
+# ---------------------------------------------------------------------------
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 4
+  # Scale up when average CPU across all pods exceeds 60%.
+  # 60% gives headroom before latency degrades; too low causes thrashing.
+  targetCPUUtilizationPercentage: 60
+
+# ---------------------------------------------------------------------------
+# Probes
+# ---------------------------------------------------------------------------
+# The /health endpoint returns 200 only after the model is loaded from RGW.
+# Initial delay must cover the model download time (~5 s on local network).
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+  readiness:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 5

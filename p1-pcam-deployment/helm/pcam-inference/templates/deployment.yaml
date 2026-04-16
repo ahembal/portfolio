@@ -1,0 +1,125 @@
+# deployment.yaml — declares the desired pod state for the inference service.
+#
+# Key design decisions documented inline below.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "pcam-inference.fullname" . }}
+  labels:
+    {{- include "pcam-inference.labels" . | nindent 4 }}
+spec:
+  # replicaCount is the floor — HPA will scale above this under load.
+  # We do NOT set replicas when HPA is enabled, because if both are set,
+  # a manual `helm upgrade` would reset replicas to 1 and fight the HPA.
+  # The if/else below avoids that conflict.
+  {{- if not .Values.hpa.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+
+  selector:
+    matchLabels:
+      # Selectors are immutable after first apply. Using the minimal
+      # selectorLabels helper (name + instance) keeps them stable across
+      # chart version bumps that add new labels to the pod template.
+      {{- include "pcam-inference.selectorLabels" . | nindent 6 }}
+
+  strategy:
+    # RollingUpdate replaces pods gradually so the service stays available
+    # during upgrades. maxUnavailable: 0 ensures at least one pod is always
+    # ready (important when replicaCount is 1 — avoids a full outage window).
+    # maxSurge: 1 allows one extra pod during the transition, so the new pod
+    # can pull the model from RGW before the old one is terminated.
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+
+  template:
+    metadata:
+      labels:
+        {{- include "pcam-inference.labels" . | nindent 8 }}
+    spec:
+      # Non-root security context mirrors the Dockerfile's `useradd appuser`
+      # step. runAsNonRoot: true causes K8s to reject the pod if the image
+      # accidentally runs as UID 0, providing a defence-in-depth check.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+
+      containers:
+        - name: pcam-inference
+          # Image tag comes from values.yaml (.Values.image.tag).
+          # CI updates this field to the git SHA after each build and commits
+          # it back. ArgoCD detects the change and triggers a rolling update.
+          # Chart.AppVersion is reserved for semantic version bumps (0.1.0 etc),
+          # not per-commit build identifiers.
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          # ----------------------------------------------------------------
+          # Environment variables
+          # ----------------------------------------------------------------
+          # Non-sensitive config is injected from the ConfigMap. This keeps
+          # the Deployment spec short and lets you change config (e.g. model
+          # key) by updating only the ConfigMap + rolling the pods.
+          envFrom:
+            - configMapRef:
+                name: {{ include "pcam-inference.fullname" . }}-config
+
+          # Sensitive credentials are injected individually from the Secret
+          # rather than via secretRef (which would dump ALL keys). Explicit
+          # env mapping makes it clear exactly which keys are consumed and
+          # maps them to the exact names main.py expects.
+          env:
+            - name: RGW_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentialsSecret }}
+                  key: access-key
+            - name: RGW_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.credentialsSecret }}
+                  key: secret-key
+
+          # ----------------------------------------------------------------
+          # Probes
+          # ----------------------------------------------------------------
+          # livenessProbe: if /health returns non-2xx after startup, K8s
+          #   restarts the container. Guards against silent hang states.
+          # readinessProbe: gates traffic. The pod won't receive requests
+          #   until /health returns 200, which only happens after the model
+          #   is fully downloaded and loaded. Prevents 503s during cold start.
+          #
+          # initialDelaySeconds must cover the model download from RGW.
+          # On the homelab LAN a ~45 MB model downloads in ~1 s, but we use
+          # 15 s for readiness and 30 s for liveness to be safe under load.
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.probes.liveness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.liveness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.liveness.periodSeconds }}
+
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.probes.readiness.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.probes.readiness.initialDelaySeconds }}
+            periodSeconds: {{ .Values.probes.readiness.periodSeconds }}
+
+          # ----------------------------------------------------------------
+          # Resource limits
+          # ----------------------------------------------------------------
+          # requests: what the scheduler uses to place the pod on a node.
+          # limits: hard cap — exceeding CPU is throttled; exceeding memory
+          #   causes OOMKill. We set limit > request to allow CPU bursting
+          #   during the model download + inference warm-up without getting
+          #   throttled.
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}

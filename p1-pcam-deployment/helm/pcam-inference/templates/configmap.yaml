@@ -1,0 +1,29 @@
+# configmap.yaml — non-sensitive runtime configuration for the inference pod.
+#
+# Why a ConfigMap instead of baking values into the Deployment env block?
+# - A ConfigMap can be updated (kubectl apply) and pods restarted without
+#   touching the Deployment spec. This lets you change the model key or RGW
+#   endpoint at runtime without triggering a full rollout.
+# - It also makes the Deployment template cleaner: one envFrom reference
+#   instead of a long list of env entries.
+#
+# What does NOT go here:
+# - RGW_ACCESS_KEY / RGW_SECRET_KEY — those are in a K8s Secret (see
+#   credentialsSecret in values.yaml). ConfigMaps are stored in plaintext
+#   in etcd; secrets at least have base64 encoding and can be locked down
+#   with RBAC / encryption at rest.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "pcam-inference.fullname" . }}-config
+  labels:
+    {{- include "pcam-inference.labels" . | nindent 4 }}
+data:
+  # RGW_ENDPOINT is read by ServingConfig.from_env() in main.py.
+  # Default matches the Ceph node IP on the homelab network.
+  RGW_ENDPOINT: {{ .Values.model.rgwEndpoint | quote }}
+
+  # MODEL_BUCKET + MODEL_KEY together identify the artifact in Ceph RGW.
+  # Override MODEL_KEY to deploy a different model version without a rebuild.
+  MODEL_BUCKET: {{ .Values.model.bucket | quote }}
+  MODEL_KEY:    {{ .Values.model.key | quote }}
