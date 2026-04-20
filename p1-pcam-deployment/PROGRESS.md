@@ -39,7 +39,7 @@
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 14 | Test /predict endpoint | ✅ Done | `{"label":"normal","confidence":1.0,"latency_ms":917.61}` — dummy weights; awaiting real Kaggle checkpoint |
-| 15 | Load test + HPA demo | ⬜ Pending | locust, `kubectl get hpa -w`, screenshot scaling events |
+| 15 | Load test + HPA demo | ✅ Done | locust 20 users → 396% CPU → HPA scaled 1→4 replicas; events captured in hpa-watch.log |
 | 16 | Prometheus + Grafana dashboard | ⬜ Pending | Latency, throughput, error rate — screenshot for portfolio |
 
 ### Infra hygiene

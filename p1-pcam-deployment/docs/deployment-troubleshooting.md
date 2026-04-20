@@ -321,3 +321,38 @@ restarts observed after kernel upgrade.
 **Note:** OSDs 0 and 1 and the sought-perch RGW were already in failed state before
 the reboot (likely caused by the same Flannel instability). The pcam service uses
 quick-thrush (192.168.1.200) as its RGW endpoint, so this did not affect the deployment.
+
+---
+
+## 14. metrics-server — kubelet TLS SAN mismatch
+
+**Symptom:** `kubectl top nodes` returns `ServiceUnavailable`. metrics-server logs show:
+```
+Failed to scrape node err="tls: failed to verify certificate: x509: cannot validate
+certificate for 192.168.1.200 because it doesn't contain any IP SANs" node="quick-thrush"
+```
+Same error for all nodes.
+
+**Root cause:** By default, metrics-server verifies the TLS certificate presented by
+each kubelet when scraping `/metrics/resource`. The kubelet serving certificates on
+this cluster were generated without IP Subject Alternative Names (SANs) for the node
+LAN IPs. Certificate validation therefore fails for every node.
+
+**Workaround applied (homelab):**
+```bash
+kubectl patch deployment metrics-server -n kube-system --type=json \
+  -p='[{"op":"add","path":"/spec/template/spec/containers/0/args/-",
+        "value":"--kubelet-insecure-tls"}]'
+```
+`--kubelet-insecure-tls` tells metrics-server to skip certificate verification when
+scraping kubelets. This is the official homelab/dev workaround documented in the
+metrics-server README.
+
+**Known risk:** Disables certificate verification between metrics-server and kubelets.
+An attacker on the LAN could MITM metrics traffic. Acceptable for a single-tenant
+homelab; not acceptable in production.
+
+**Proper fix (deferred to Step 17):** Regenerate kubelet serving certificates with the
+correct IP SANs for each node. This is the same root cause as the API server TLS SAN
+issue (Step 17) — both need kubeadm cert rotation. The two fixes should be done together
+to avoid rotating certs twice.
