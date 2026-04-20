@@ -49,7 +49,7 @@ FROM python:3.11-slim AS builder
 WORKDIR /build
 
 # Copy requirements first — maximises Docker layer cache hits
-COPY requirements.txt .
+COPY p1-pcam-deployment/serving/requirements.txt .
 
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir --prefix=/install -r requirements.txt
@@ -66,7 +66,7 @@ WORKDIR /app
 COPY --from=builder /install/lib/python3.11/site-packages /usr/lib/python3/dist-packages
 
 # Copy application source
-COPY main.py .
+COPY p1-pcam-deployment/serving/main.py .
 
 # Copy the shared RGW client — needed by main.py at runtime
 COPY infra/ceph-rgw/boto3_config.py ./infra/ceph-rgw/boto3_config.py
@@ -78,4 +78,4 @@ EXPOSE 8080
 # Uvicorn with a single worker — horizontal scaling is handled by K8s HPA,
 # not by running multiple workers inside one pod. One process per pod keeps
 # resource accounting clean and crash isolation simple.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
+CMD ["-m", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]
