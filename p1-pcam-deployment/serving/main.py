@@ -55,7 +55,7 @@ from prometheus_client import (
     REGISTRY,
 )
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "infra" / "ceph-rgw"))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "infra" / "ceph-rgw"))
 from boto3_config import RGWConfig, get_s3_client
 
 logging.basicConfig(
@@ -166,7 +166,7 @@ class ServingConfig:
 # Model
 # ---------------------------------------------------------------------------
 
-def build_model(num_classes: int = 2) -> nn.Module:
+def build_model(num_classes: int = 1) -> nn.Module:
     """Build ResNet-18 with the same architecture used during training."""
     model    = models.resnet18(weights=None)
     model.fc = nn.Linear(model.fc.in_features, num_classes)
