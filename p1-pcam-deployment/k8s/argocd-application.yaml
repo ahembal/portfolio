@@ -1,0 +1,33 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: pcam-inference
+  namespace: argocd
+  # Cascade delete: removing this Application also removes all K8s resources
+  # it manages. Safe for a homelab; set to false in production.
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+
+  source:
+    repoURL: https://github.com/ahembal/portfolio.git
+    targetRevision: main
+    path: p1-pcam-deployment/helm/pcam-inference
+
+    helm:
+      # Release name used by helm upgrade --install
+      releaseName: pcam
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: pcam
+
+  syncPolicy:
+    automated:
+      # ArgoCD will automatically sync when git diverges from cluster state.
+      prune: true      # delete resources removed from git
+      selfHeal: true   # revert manual kubectl edits
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
