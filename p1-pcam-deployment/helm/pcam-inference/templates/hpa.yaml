@@ -9,7 +9,7 @@
 # compute. CPU utilization is therefore a reliable proxy for request rate,
 # making it a practical scaling signal.
 #
-# The `{{- if .Values.hpa.enabled }}` guard lets you disable HPA for
+# The `hpa.enabled` guard lets you disable HPA for
 # simple single-node testing by setting hpa.enabled: false in values.
 # When HPA is enabled, the Deployment omits the `replicas` field (see
 # deployment.yaml) to avoid the two fighting each other on `helm upgrade`.

@@ -66,6 +66,11 @@ model:
 credentialsSecret: "pcam-rgw-credentials"
 
 # ---------------------------------------------------------------------------
+# Image pull secret — read-only GHCR token, sealed in git
+# ---------------------------------------------------------------------------
+imagePullSecret: "ghcr-pull-secret"
+
+# ---------------------------------------------------------------------------
 # Resources
 # ---------------------------------------------------------------------------
 # CPU inference on a homelab worker. No GPU available, so we set conservative

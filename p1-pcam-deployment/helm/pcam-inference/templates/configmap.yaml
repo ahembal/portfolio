@@ -27,3 +27,8 @@ data:
   # Override MODEL_KEY to deploy a different model version without a rebuild.
   MODEL_BUCKET: {{ .Values.model.bucket | quote }}
   MODEL_KEY:    {{ .Values.model.key | quote }}
+
+  # PyTorch inductor tries to resolve a cache dir by calling getpass.getuser(),
+  # which requires the UID to be in /etc/passwd. Distroless has no passwd for
+  # arbitrary UIDs. Setting this explicitly bypasses the getpwuid() call.
+  TORCHINDUCTOR_CACHE_DIR: "/tmp/torchinductor"

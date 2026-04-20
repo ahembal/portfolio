@@ -44,7 +44,10 @@ spec:
       # accidentally runs as UID 0, providing a defence-in-depth check.
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
+        runAsUser: 65532
+
+      imagePullSecrets:
+        - name: {{ .Values.imagePullSecret }}
 
       containers:
         - name: pcam-inference
