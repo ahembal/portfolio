@@ -32,13 +32,13 @@
 | 9 | GitHub Actions CI pipeline | ✅ Done | pytest → docker build → push GHCR → update values.yaml tag |
 | 10 | RBAC — dedicated service account for ArgoCD | ✅ Done | k8s/rbac.yaml — namespaced Role, automountToken: false |
 | 11 | Install ArgoCD on cluster | ✅ Done | Running on quick-thrush; NetworkPolicies removed for stability |
-| 12 | Sealed Secrets for RGW credentials | ⬜ Pending | Install controller → kubeseal RGW creds → commit SealedSecret |
-| 13 | Wire ArgoCD Application to Helm chart | ⬜ Pending | ArgoCD Application CR pointing at `helm/pcam-inference` on main |
+| 12 | Sealed Secrets for RGW credentials | ✅ Done | SealedSecret for RGW creds + GHCR pull token; both sealed and committed |
+| 13 | Wire ArgoCD Application to Helm chart | ✅ Done | ArgoCD Application CR committed; deployed via `helm install` (DNS step 19 deferred) |
 
 ### Testing & observability
 | # | Step | Status | Notes |
 |---|------|--------|-------|
-| 14 | Test /predict endpoint | ⬜ Pending | curl a real PCam patch image through Nginx Ingress |
+| 14 | Test /predict endpoint | ✅ Done | `{"label":"normal","confidence":1.0,"latency_ms":917.61}` — dummy weights; awaiting real Kaggle checkpoint |
 | 15 | Load test + HPA demo | ⬜ Pending | locust, `kubectl get hpa -w`, screenshot scaling events |
 | 16 | Prometheus + Grafana dashboard | ⬜ Pending | Latency, throughput, error rate — screenshot for portfolio |
 
@@ -46,6 +46,7 @@
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 17 | Fix API server TLS SAN | ⬜ Pending | Add Tailscale IP `100.123.23.6` to cert SANs; drop insecure-skip-tls-verify |
+| 19 | Fix cluster DNS — MAAS DHCP update | ⬜ Deferred | Update MAAS DHCP to hand out `192.168.1.90` as DNS; unblocks ArgoCD live sync. See docs/deployment-troubleshooting.md §7 |
 
 ### Docs
 | # | Step | Status | Notes |
