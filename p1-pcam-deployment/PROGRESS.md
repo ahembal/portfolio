@@ -1,6 +1,6 @@
 # Project 1 — PCam ML Deployment Pipeline
 ## Progress Tracker
-*Last updated: 2026-04-13*
+*Last updated: 2026-04-17*
 
 ---
 
@@ -9,30 +9,30 @@
 ### Model training
 | # | Step | Status | Notes |
 |---|------|--------|-------|
-| 1 | Train on Kaggle (T4 GPU) | ✅ Done | 5 epochs, ResNet-18 — AUC 0.9438, Acc 83.5%, F1 0.807 |
-| 2 | Download artifacts from Kaggle | ⬜ Pending | best_model.pt, metrics.json, config.json |
+| 1 | Train on Kaggle (T4 GPU) | ✅ Done | 6 epochs, ResNet-18 — AUC 0.9657, Acc 90.0%, F1 0.897 |
+| 2 | Download artifacts from Kaggle | ⬜ Pending | best_model.pt, metrics.json, config.json, threshold.json |
 | 3 | Push artifacts to Ceph RGW | ⬜ Pending | `push_kaggle_artifacts.py --zip ... --run-id kaggle-001` |
 
 ### Container image
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 4 | Write Dockerfile | ✅ Done | Multi-stage, pulls model from RGW at startup |
-| 5 | Switch runtime to distroless image | ⬜ Pending | Smaller attack surface; pairs with multi-stage story |
+| 5 | Switch runtime to distroless image | ✅ Done | gcr.io/distroless/python3-debian12:nonroot, no shell |
 
 ### Helm chart
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 6 | Write Helm chart | ✅ Done | deployment, service, configmap, hpa, _helpers, values |
-| 7 | Add Nginx Ingress template to chart | ⬜ Pending | Real hostname instead of `kubectl port-forward` |
-| 8 | Add FastAPI `/metrics` endpoint | ⬜ Pending | Expose Prometheus-scrapeable latency + request count |
+| 7 | Add Nginx Ingress template to chart | ✅ Done | ingress.yaml gated on ingress.enabled=false |
+| 8 | Add FastAPI `/metrics` endpoint | ✅ Done | prometheus-client Counter + Histogram + Info |
 
 ### CI/CD
 | # | Step | Status | Notes |
 |---|------|--------|-------|
-| 9 | GitHub Actions CI pipeline | ⬜ Pending | On push: pytest → docker build → push to GHCR → update image tag in values.yaml |
-| 10 | RBAC — dedicated service account for ArgoCD | ⬜ Pending | Least-privilege SA; shows K8s security awareness |
-| 11 | Install ArgoCD on cluster | ⬜ Pending | GitOps CD — cluster pulls from git, no manual helm |
-| 12 | Sealed Secrets for RGW credentials | ⬜ Pending | Credentials encrypted in git; no out-of-band secret creation |
+| 9 | GitHub Actions CI pipeline | ✅ Done | pytest → docker build → push GHCR → update values.yaml tag |
+| 10 | RBAC — dedicated service account for ArgoCD | ✅ Done | k8s/rbac.yaml — namespaced Role, automountToken: false |
+| 11 | Install ArgoCD on cluster | ✅ Done | Running on quick-thrush; NetworkPolicies removed for stability |
+| 12 | Sealed Secrets for RGW credentials | ⬜ Pending | Install controller → kubeseal RGW creds → commit SealedSecret |
 | 13 | Wire ArgoCD Application to Helm chart | ⬜ Pending | ArgoCD Application CR pointing at `helm/pcam-inference` on main |
 
 ### Testing & observability
@@ -122,17 +122,19 @@ ArgoCD (running on cluster) detects drift
 
 - Dataset: `andrewmvd/metastatic-tissue-classification-patchcamelyon`
 - Model: ResNet-18, ImageNet pretrained
-- Epochs: 5
-- Batch size: 128
-- Optimizer: Adam, lr=1e-4
-- First step loss: 0.7737
+- Epochs: 6 (best at epoch 6)
+- Batch size: 128 × N_GPUs, LR scaled linearly
+- Optimizer: AdamW, cosine LR schedule, AMP
+- Augmentation: RandomRot90 (zero-copy D4), channels-last NHWC
 
-## Results (fill in after training)
+## Results
 
-| Epoch | Train loss | Val loss | Accuracy | AUC | F1 |
-|-------|------------|----------|----------|-----|----|
-| 1 | | | | | |
-| 2 | | | | | |
-| 3 | | | | | |
-| 4 | | | | | |
-| 5 | | | | | |
+| Metric | Value |
+|--------|-------|
+| AUC | 0.9657 |
+| Accuracy | 90.0% |
+| F1 | 0.897 |
+| Train loss (ep 6) | 0.2941 |
+| Val loss (ep 6) | 0.3566 |
+| Youden threshold | 0.3694 (sens 90.6%, spec 90.4%) |
+| 95% sensitivity threshold | 0.2044 (spec 82.5%) |

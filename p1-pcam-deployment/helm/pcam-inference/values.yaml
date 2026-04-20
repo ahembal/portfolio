@@ -49,9 +49,9 @@ service:
 model:
   # RGW endpoint on the local network. Pods on the K8s cluster can reach
   # the Ceph node directly — no need for a K8s Service in front of it.
-  rgwEndpoint: "http://192.168.1.16"
+  rgwEndpoint: "http://192.168.1.200"
   # S3 bucket that holds trained artifacts
-  bucket: "ml-artifacts"
+  bucket: "pcam-models"
   # Key path inside the bucket. Override at deploy time to switch model
   # versions without changing any other config.
   key: "pcam/kaggle-001/best_model.pt"
