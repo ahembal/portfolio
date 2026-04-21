@@ -362,9 +362,14 @@ async def predict(file: UploadFile = File(...)):
     REQUEST_LATENCY.labels(endpoint="/predict").observe(latency_ms)
     REQUEST_COUNT.labels(endpoint="/predict", status="200").inc()
 
-    probs      = torch.softmax(logits, dim=1)[0]
-    class_idx  = int(probs.argmax())
-    confidence = float(probs[class_idx])
+    # Model uses num_classes=1 with BCEWithLogitsLoss — single sigmoid output.
+    # torch.softmax on a 1-element dimension always returns 1.0, so we use
+    # sigmoid to get P(tumour), then derive label and confidence from that.
+    prob_tumour = float(torch.sigmoid(logits).squeeze())
+    class_idx   = int(prob_tumour >= 0.5)   # Youden threshold is 0.3694 but
+                                             # 0.5 is safe default; caller can
+                                             # apply threshold.json externally
+    confidence  = prob_tumour if class_idx == 1 else 1.0 - prob_tumour
 
     return JSONResponse({
         "label":      LABELS[class_idx],
