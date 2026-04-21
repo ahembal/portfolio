@@ -51,7 +51,7 @@
 ### Docs
 | # | Step | Status | Notes |
 |---|------|--------|-------|
-| 18 | Write Q5, Q7, Q9 docs | ⬜ Pending | Answer application questions with evidence from above |
+| 18 | Write Q5, Q7, Q9 docs | ✅ Done | Answer application questions with evidence from above |
 
 ---
 
