@@ -10,8 +10,8 @@
 | # | Step | Status | Notes |
 |---|------|--------|-------|
 | 1 | Train on Kaggle (T4 GPU) | ✅ Done | 6 epochs, ResNet-18 — AUC 0.9657, Acc 90.0%, F1 0.897 |
-| 2 | Download artifacts from Kaggle | ⬜ Pending | best_model.pt, metrics.json, config.json, threshold.json |
-| 3 | Push artifacts to Ceph RGW | ⬜ Pending | `push_kaggle_artifacts.py --zip ... --run-id kaggle-001` |
+| 2 | Download artifacts from Kaggle | ✅ Done | best_model.pt, metrics.json, config.json, threshold.json — in artifacts/ |
+| 3 | Push artifacts to Ceph RGW | ✅ Done | s3://pcam-models/pcam/kaggle-001/ — all 4 files confirmed on quick-thrush RGW |
 
 ### Container image
 | # | Step | Status | Notes |
