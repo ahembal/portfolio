@@ -45,7 +45,7 @@
 ### Infra hygiene
 | # | Step | Status | Notes |
 |---|------|--------|-------|
-| 17 | Fix API server TLS SAN | ⬜ Pending | Add Tailscale IP `100.123.23.6` to cert SANs; drop insecure-skip-tls-verify |
+| 17 | Fix API server TLS SAN | ✅ Done | Added `100.123.23.6` to cert SANs via `kubeadm init phase certs apiserver --apiserver-cert-extra-sans`; kubeadm ConfigMap updated; `insecure-skip-tls-verify` dropped from kubeconfig |
 | 19 | Fix cluster DNS — MAAS DHCP update | ⬜ Deferred | Update MAAS DHCP to hand out `192.168.1.90` as DNS; unblocks ArgoCD live sync. See docs/deployment-troubleshooting.md §7 |
 
 ### Docs
