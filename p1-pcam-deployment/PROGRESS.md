@@ -1,6 +1,6 @@
 # Project 1 — PCam ML Deployment Pipeline
 ## Progress Tracker
-*Last updated: 2026-04-17*
+*Last updated: 2026-04-21*
 
 ---
 
@@ -40,7 +40,7 @@
 |---|------|--------|-------|
 | 14 | Test /predict endpoint | ✅ Done | `{"label":"normal","confidence":1.0,"latency_ms":917.61}` — dummy weights; awaiting real Kaggle checkpoint |
 | 15 | Load test + HPA demo | ✅ Done | locust 20 users → 396% CPU → HPA scaled 1→4 replicas; events captured in hpa-watch.log |
-| 16 | Prometheus + Grafana dashboard | ⬜ Pending | Latency, throughput, error rate — screenshot for portfolio |
+| 16 | Prometheus + Grafana dashboard | ✅ Done | kube-prometheus-stack on quick-thrush; ServiceMonitor with `release: kube-prom` label; 5-panel Grafana dashboard — req rate, error rate, latency p50/p95/p99, HPA replicas, pod CPU |
 
 ### Infra hygiene
 | # | Step | Status | Notes |

@@ -1,0 +1,25 @@
+---
+# ServiceMonitor tells Prometheus how to scrape the pcam-inference service.
+# The prometheus-operator watches for ServiceMonitor resources and
+# automatically updates Prometheus scrape config — no manual config reload.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: pcam-inference
+  namespace: pcam
+  labels:
+    # app.kubernetes.io/name used by the ServiceMonitor selector in spec below.
+    app.kubernetes.io/name: pcam-inference
+    # release: kube-prom is required — the Prometheus CR was installed with
+    # helm release name "kube-prom" and its serviceMonitorSelector defaults to
+    # matchLabels: {release: kube-prom}.  Without this label the operator
+    # silently ignores the ServiceMonitor.
+    release: kube-prom
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: pcam-inference
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s

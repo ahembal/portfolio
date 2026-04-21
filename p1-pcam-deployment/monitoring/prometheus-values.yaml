@@ -1,0 +1,110 @@
+# prometheus-values.yaml — lean kube-prometheus-stack for homelab portfolio demo
+#
+# Disabled components:
+#   alertmanager    — not needed for a demo; adds ~256Mi RAM for no benefit
+#   etcd/scheduler/controller-manager monitoring — homelab control plane is
+#     on clever-fly which is SchedulingDisabled; these endpoints aren't exposed
+#
+# Enabled:
+#   prometheus       — scrapes pcam /metrics + node/pod/k8s metrics
+#   grafana          — dashboard UI, accessible via port-forward
+#   node-exporter    — per-node CPU/memory/network metrics
+#   kube-state-metrics — deployment/pod/HPA state metrics
+
+alertmanager:
+  enabled: false
+
+# ---------------------------------------------------------------------------
+# Node placement — pin all monitoring pods to quick-thrush
+# sought-perch Flannel is unstable (kernel bug); quick-thrush is stable
+# ---------------------------------------------------------------------------
+_nodeSelector: &nodeSelector
+  kubernetes.io/hostname: quick-thrush
+
+# ---------------------------------------------------------------------------
+# Prometheus
+# ---------------------------------------------------------------------------
+prometheus:
+  prometheusSpec:
+    nodeSelector: *nodeSelector
+    # Scrape interval — 15 s is fine for a homelab demo
+    scrapeInterval: "15s"
+    evaluationInterval: "15s"
+
+    # emptyDir storage — ephemeral, data lost on pod restart.
+    # Acceptable for a portfolio demo; proper persistence requires a StorageClass
+    # backed by Ceph RBD (no dynamic provisioner configured yet on this cluster).
+    retention: 2h
+    storageSpec:
+      emptyDir:
+        medium: ""
+
+    # Allow Prometheus to discover ServiceMonitors in ALL namespaces.
+    # Required to scrape pcam namespace.
+    serviceMonitorNamespaceSelector: {}
+    # NOTE: kube-prometheus-stack defaults serviceMonitorSelector to
+    # matchLabels: {release: <helm-release-name>}.  Omitting this key
+    # does NOT mean "select all" — the chart injects the default.
+    # ServiceMonitors must carry label  release: kube-prom  to be discovered.
+    podMonitorNamespaceSelector: {}
+    podMonitorSelector: {}
+
+    resources:
+      requests:
+        cpu: "200m"
+        memory: "512Mi"
+      limits:
+        cpu: "1000m"
+        memory: "2Gi"
+
+# ---------------------------------------------------------------------------
+# Grafana
+# ---------------------------------------------------------------------------
+grafana:
+  enabled: true
+  adminPassword: "homelab"   # local-only — not exposed externally
+  nodeSelector: *nodeSelector
+
+  resources:
+    requests:
+      cpu: "100m"
+      memory: "256Mi"
+    limits:
+      cpu: "500m"
+      memory: "512Mi"
+
+  # Pre-load the pcam inference dashboard from a ConfigMap
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+
+# ---------------------------------------------------------------------------
+# Node exporter
+# ---------------------------------------------------------------------------
+nodeExporter:
+  enabled: true
+
+# ---------------------------------------------------------------------------
+# kube-state-metrics
+# ---------------------------------------------------------------------------
+kubeStateMetrics:
+  enabled: true
+
+prometheusOperator:
+  nodeSelector: *nodeSelector
+
+kube-state-metrics:
+  nodeSelector: *nodeSelector
+
+# ---------------------------------------------------------------------------
+# Disable probes for components not accessible in this cluster topology
+# ---------------------------------------------------------------------------
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false

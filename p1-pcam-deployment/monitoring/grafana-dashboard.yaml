@@ -1,0 +1,112 @@
+---
+# Grafana dashboard ConfigMap — loaded automatically by the grafana sidecar
+# (grafana.sidecar.dashboards.enabled=true in prometheus-values.yaml).
+# The `grafana_dashboard: "1"` label is the discovery signal.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pcam-inference-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"
+data:
+  pcam-inference.json: |
+    {
+      "title": "PCam Inference Service",
+      "uid": "pcam-inference",
+      "tags": ["pcam", "ml", "inference"],
+      "timezone": "browser",
+      "schemaVersion": 38,
+      "refresh": "15s",
+      "time": { "from": "now-1h", "to": "now" },
+      "panels": [
+        {
+          "id": 1,
+          "title": "Request Rate (req/s)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+          "targets": [
+            {
+              "expr": "sum(rate(pcam_requests_total[1m]))",
+              "legendFormat": "requests/s"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "reqps", "color": { "mode": "palette-classic" } }
+          }
+        },
+        {
+          "id": 2,
+          "title": "Error Rate (%)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+          "targets": [
+            {
+              "expr": "100 * sum(rate(pcam_requests_total{status='error'}[1m])) / sum(rate(pcam_requests_total[1m]))",
+              "legendFormat": "error %"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "percent", "min": 0, "max": 100,
+              "color": { "mode": "fixed", "fixedColor": "red" } }
+          }
+        },
+        {
+          "id": 3,
+          "title": "Inference Latency — p50 / p95 / p99",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 24, "x": 0, "y": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, sum(rate(pcam_request_latency_ms_bucket[1m])) by (le))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, sum(rate(pcam_request_latency_ms_bucket[1m])) by (le))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, sum(rate(pcam_request_latency_ms_bucket[1m])) by (le))",
+              "legendFormat": "p99"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "ms", "color": { "mode": "palette-classic" } }
+          }
+        },
+        {
+          "id": 4,
+          "title": "HPA Replicas",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+          "targets": [
+            {
+              "expr": "kube_horizontalpodautoscaler_status_current_replicas{namespace='pcam',horizontalpodautoscaler='pcam-pcam-inference'}",
+              "legendFormat": "current replicas"
+            },
+            {
+              "expr": "kube_horizontalpodautoscaler_spec_max_replicas{namespace='pcam',horizontalpodautoscaler='pcam-pcam-inference'}",
+              "legendFormat": "max replicas"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "decimals": 0 }
+          }
+        },
+        {
+          "id": 5,
+          "title": "Pod CPU Usage (millicores)",
+          "type": "timeseries",
+          "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+          "targets": [
+            {
+              "expr": "sum(rate(container_cpu_usage_seconds_total{namespace='pcam',container='pcam-inference'}[1m])) by (pod) * 1000",
+              "legendFormat": "{{pod}}"
+            }
+          ],
+          "fieldConfig": {
+            "defaults": { "unit": "short", "custom": { "lineWidth": 2 } }
+          }
+        }
+      ]
+    }
