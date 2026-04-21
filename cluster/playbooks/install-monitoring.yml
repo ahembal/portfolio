@@ -1,0 +1,61 @@
+---
+# install-monitoring.yml — Install kube-prometheus-stack (Prometheus + Grafana)
+#
+# Helm release name: kube-prom (important — ServiceMonitors must carry
+# label `release: kube-prom` to be discovered by the prometheus-operator)
+#
+# Storage: emptyDir (no StorageClass on homelab) — metrics lost on pod restart
+# Pins: all monitoring pods run on quick-thrush (stable worker)
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/install-monitoring.yml
+#
+# After install, apply the pcam ServiceMonitor and Grafana dashboard:
+#   kubectl apply -f p1-pcam-deployment/monitoring/service-monitor.yaml
+#   kubectl apply -f p1-pcam-deployment/monitoring/grafana-dashboard.yaml
+
+- name: Install kube-prometheus-stack
+  hosts: localhost
+  connection: local
+  vars:
+    release_name: kube-prom
+    namespace: monitoring
+    repo_root: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Add prometheus-community Helm repo
+      command: helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+
+    - name: Update Helm repos
+      command: helm repo update
+
+    - name: Create monitoring namespace
+      command: kubectl create namespace {{ namespace }}
+      register: ns_result
+      failed_when: ns_result.rc != 0 and 'already exists' not in ns_result.stderr
+
+    - name: Install kube-prometheus-stack
+      command: >
+        helm upgrade --install {{ release_name }} prometheus-community/kube-prometheus-stack
+        --namespace {{ namespace }}
+        -f {{ repo_root }}/p1-pcam-deployment/monitoring/prometheus-values.yaml
+        --timeout 5m
+
+    - name: Apply pcam ServiceMonitor
+      command: kubectl apply -f {{ repo_root }}/p1-pcam-deployment/monitoring/service-monitor.yaml
+
+    - name: Apply pcam Grafana dashboard ConfigMap
+      command: kubectl apply -f {{ repo_root }}/p1-pcam-deployment/monitoring/grafana-dashboard.yaml
+
+    - name: Wait for Grafana to be ready
+      command: >
+        kubectl wait deployment {{ release_name }}-grafana -n {{ namespace }}
+        --for=condition=Available --timeout=120s
+
+    - name: Print Grafana access info
+      debug:
+        msg: >
+          Grafana is up. Access via:
+            kubectl port-forward -n monitoring svc/kube-prom-grafana 3000:80
+          Default credentials: admin / prom-operator
+          The pcam dashboard should appear under Dashboards > PCam Inference.

@@ -1,0 +1,2 @@
+# Worker-node specific vars
+node_role: worker

@@ -1,0 +1,41 @@
+---
+# dns/tasks/main.yml — Configure systemd-resolved to use MAAS DNS
+#
+# MAAS runs bind9 at 192.168.1.90 and knows all homelab hostnames.
+# Without this drop-in, nodes use the default systemd-resolved stub (127.0.0.53)
+# which forwards upstream to 1.1.1.1 — bypassing MAAS DNS entirely.
+#
+# This was applied manually on 2026-04-20; this role makes it reproducible.
+# Applied to: clever-fly, quick-thrush, sought-perch
+
+- name: Create systemd-resolved drop-in directory
+  file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Write MAAS DNS drop-in
+  copy:
+    dest: /etc/systemd/resolved.conf.d/maas-dns.conf
+    owner: root
+    group: root
+    mode: "0644"
+    content: |
+      # Drop-in: point systemd-resolved at the MAAS-managed DNS server
+      # MAAS bind9 at 192.168.1.90 knows all homelab hostnames and forwards
+      # external queries upstream. This is required for ArgoCD to reach GitHub
+      # and for in-cluster name resolution to work correctly.
+      # Applied: 2026-04-20 | Codified: 2026-04-21
+      [Resolve]
+      DNS={{ maas_dns_server }}
+      FallbackDNS={{ upstream_dns }}
+      Domains=~.
+  notify: restart systemd-resolved
+
+- name: Enable and start systemd-resolved
+  systemd:
+    name: systemd-resolved
+    state: started
+    enabled: true

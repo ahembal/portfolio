@@ -1,0 +1,105 @@
+---
+# bootstrap.yml — Full cluster bootstrap: OS prep → containerd → kubeadm init → Flannel
+#
+# Run order:
+#   1. common      — OS packages, sysctl, swap off, kernel modules
+#   2. containerd  — container runtime (prerequisite for kubeadm)
+#   3. kubeadm     — install kubeadm/kubelet/kubectl binaries
+#   4. init        — kubeadm init on control-plane only
+#   5. flannel     — CNI (must run after init, before workers join)
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/bootstrap.yml
+#   ansible-playbook -i inventory/hosts.ini playbooks/bootstrap.yml --tags init
+#
+# Prerequisites:
+#   - Nodes provisioned by MAAS with Ubuntu 24.04
+#   - SSH key auth configured (ansible_user: ubuntu)
+#   - This machine can reach all nodes on 192.168.1.0/24
+
+- name: Prepare all nodes (OS, containerd, kubeadm binaries)
+  hosts: k8s_cluster
+  become: true
+  roles:
+    - common
+    - containerd
+    - kubeadm
+
+- name: Init control-plane
+  hosts: control_plane
+  become: true
+  tags: init
+  tasks:
+    - name: Check if cluster already initialised
+      stat:
+        path: /etc/kubernetes/admin.conf
+      register: kubeadm_conf
+
+    - name: kubeadm init
+      command: >
+        kubeadm init
+        --kubernetes-version={{ k8s_version }}
+        --control-plane-endpoint={{ control_plane_endpoint }}
+        --pod-network-cidr={{ pod_cidr }}
+        --apiserver-cert-extra-sans={{ ([tailscale_ip] + apiserver_extra_sans) | join(',') }}
+      when: not kubeadm_conf.stat.exists
+      register: kubeadm_init
+
+    - name: Set up kubeconfig for ubuntu user
+      block:
+        - file:
+            path: /home/ubuntu/.kube
+            state: directory
+            owner: ubuntu
+            group: ubuntu
+        - copy:
+            src: /etc/kubernetes/admin.conf
+            dest: /home/ubuntu/.kube/config
+            remote_src: true
+            owner: ubuntu
+            group: ubuntu
+      when: not kubeadm_conf.stat.exists
+
+    - name: Save join command
+      shell: kubeadm token create --print-join-command
+      register: join_command
+
+    - name: Write join command to local file
+      local_action:
+        module: copy
+        content: "{{ join_command.stdout }}"
+        dest: /tmp/kubeadm_join_command.sh
+        mode: "0600"
+
+- name: Apply Flannel CNI
+  hosts: control_plane
+  become: false
+  tags: flannel
+  tasks:
+    - name: Apply Flannel manifest
+      command: >
+        kubectl apply -f
+        https://github.com/flannel-io/flannel/releases/download/{{ flannel_version }}/kube-flannel.yml
+      environment:
+        KUBECONFIG: /home/ubuntu/.kube/config
+
+- name: Join worker nodes
+  hosts: workers
+  become: true
+  tags: join
+  tasks:
+    - name: Check if already joined
+      stat:
+        path: /etc/kubernetes/kubelet.conf
+      register: kubelet_conf
+
+    - name: Read join command
+      local_action:
+        module: slurp
+        src: /tmp/kubeadm_join_command.sh
+      register: join_cmd
+      when: not kubelet_conf.stat.exists
+
+    - name: Join cluster
+      command: "{{ join_cmd.content | b64decode }}"
+      when: not kubelet_conf.stat.exists

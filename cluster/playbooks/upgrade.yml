@@ -1,0 +1,100 @@
+---
+# upgrade.yml — Rolling kubeadm upgrade: control-plane first, then workers
+#
+# Steps per node:
+#   1. Drain node (evict pods, cordon)
+#   2. Upgrade kubeadm binary
+#   3. kubeadm upgrade apply (control-plane) / kubeadm upgrade node (workers)
+#   4. Upgrade kubelet + kubectl
+#   5. Restart kubelet
+#   6. Uncordon node
+#
+# Usage:
+#   # Upgrade to a specific version (edit group_vars/all.yml k8s_version first)
+#   ansible-playbook -i inventory/hosts.ini playbooks/upgrade.yml
+#
+#   # Dry run — shows what would change
+#   ansible-playbook -i inventory/hosts.ini playbooks/upgrade.yml --check
+#
+# IMPORTANT: Only upgrade one minor version at a time (1.28 → 1.29, not 1.27 → 1.29)
+# IMPORTANT: Always upgrade control-plane before workers
+
+- name: Upgrade control-plane node
+  hosts: control_plane
+  become: true
+  serial: 1   # one node at a time
+
+  tasks:
+    - name: Drain control-plane
+      local_action:
+        module: command
+        cmd: kubectl drain {{ inventory_hostname }} --ignore-daemonsets --delete-emptydir-data
+      become: false
+
+    - name: Upgrade kubeadm on control-plane
+      apt:
+        name: "kubeadm={{ k8s_version }}-*"
+        state: present
+        allow_downgrade: false
+
+    - name: Apply upgrade plan
+      command: kubeadm upgrade apply v{{ k8s_version }} --yes
+      register: upgrade_result
+
+    - name: Upgrade kubelet and kubectl
+      apt:
+        name:
+          - "kubelet={{ k8s_version }}-*"
+          - "kubectl={{ k8s_version }}-*"
+        state: present
+
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+
+    - name: Uncordon control-plane
+      local_action:
+        module: command
+        cmd: kubectl uncordon {{ inventory_hostname }}
+      become: false
+
+- name: Upgrade worker nodes
+  hosts: workers
+  become: true
+  serial: 1   # one worker at a time — keeps service available
+
+  tasks:
+    - name: Drain worker
+      local_action:
+        module: command
+        cmd: kubectl drain {{ inventory_hostname }} --ignore-daemonsets --delete-emptydir-data
+      become: false
+
+    - name: Upgrade kubeadm on worker
+      apt:
+        name: "kubeadm={{ k8s_version }}-*"
+        state: present
+
+    - name: Upgrade node config
+      command: kubeadm upgrade node
+
+    - name: Upgrade kubelet and kubectl
+      apt:
+        name:
+          - "kubelet={{ k8s_version }}-*"
+          - "kubectl={{ k8s_version }}-*"
+        state: present
+
+    - name: Restart kubelet
+      systemd:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+
+    - name: Uncordon worker
+      local_action:
+        module: command
+        cmd: kubectl uncordon {{ inventory_hostname }}
+      become: false

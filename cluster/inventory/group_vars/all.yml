@@ -1,0 +1,27 @@
+# Variables shared across all hosts
+# Override per-group in group_vars/<group>.yml or per-host in host_vars/<host>.yml
+
+# --- Kubernetes ---
+k8s_version: "1.29.15"
+k8s_minor: "1.29"          # used for apt repo pin
+
+# --- Container runtime ---
+containerd_version: "1.7.28"
+
+# --- CNI ---
+flannel_version: "v0.25.6"
+pod_cidr: "10.244.0.0/16"  # Flannel default; must match kubeadm --pod-network-cidr
+
+# --- DNS ---
+maas_dns_server: "192.168.1.90"   # MAAS-managed DNS (bind9 on MAAS)
+upstream_dns: "1.1.1.1"           # fallback if MAAS DNS unavailable
+
+# --- Ansible connection ---
+ansible_user: ubuntu               # MAAS default image user
+ansible_python_interpreter: /usr/bin/python3
+
+# --- Cluster metadata ---
+cluster_name: homelab
+control_plane_ip: "192.168.1.184"  # clever-fly
+control_plane_endpoint: "192.168.1.184:6443"
+tailscale_ip: "100.123.23.6"       # added to API server cert SANs (Step 17)

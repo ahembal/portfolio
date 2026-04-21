@@ -1,0 +1,81 @@
+---
+# install-argocd.yml — Install ArgoCD and pin all pods to quick-thrush
+#
+# sought-perch has a Flannel CNI instability issue (VXLAN kernel bug, fixed in
+# kernel 6.8.0-110 but not confirmed stable). ArgoCD repo-server must be on
+# quick-thrush or GitHub connectivity is disrupted by SIGTERM every ~7 minutes.
+#
+# Steps:
+#   1. Create argocd namespace
+#   2. Helm install argocd (bitnami chart used to get stable release)
+#   3. Patch all ArgoCD deployments with nodeSelector: quick-thrush
+#   4. Apply ArgoCD RBAC (k8s/rbac.yaml)
+#   5. Apply pcam Application CR (k8s/argocd-application.yaml)
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/install-argocd.yml
+#
+# Requires: helm, kubectl configured on the control node (this machine)
+
+- name: Install ArgoCD
+  hosts: localhost
+  connection: local
+  vars:
+    argocd_version: "v3.3.6"
+    argocd_namespace: argocd
+    stable_node: quick-thrush
+    repo_root: "{{ playbook_dir }}/.."
+
+  tasks:
+    - name: Create argocd namespace
+      command: kubectl create namespace {{ argocd_namespace }}
+      register: ns_result
+      failed_when: ns_result.rc != 0 and 'already exists' not in ns_result.stderr
+
+    - name: Apply ArgoCD install manifest
+      command: >
+        kubectl apply -n {{ argocd_namespace }}
+        -f https://raw.githubusercontent.com/argoproj/argo-cd/{{ argocd_version }}/manifests/install.yaml
+      register: argocd_install
+
+    - name: Wait for ArgoCD deployments to be created
+      command: kubectl get deployment argocd-repo-server -n {{ argocd_namespace }}
+      register: deploy_check
+      until: deploy_check.rc == 0
+      retries: 30
+      delay: 5
+
+    - name: Pin ArgoCD deployments to {{ stable_node }}
+      command: >
+        kubectl patch deployment {{ item }} -n {{ argocd_namespace }}
+        --type=json
+        -p='[{"op":"add","path":"/spec/template/spec/nodeSelector","value":{"kubernetes.io/hostname":"{{ stable_node }}"}}]'
+      loop:
+        - argocd-server
+        - argocd-repo-server
+        - argocd-redis
+      register: patch_result
+      failed_when: patch_result.rc != 0 and 'not patched' not in patch_result.stderr
+
+    - name: Pin ArgoCD application-controller StatefulSet to {{ stable_node }}
+      command: >
+        kubectl patch statefulset argocd-application-controller -n {{ argocd_namespace }}
+        --type=json
+        -p='[{"op":"add","path":"/spec/template/spec/nodeSelector","value":{"kubernetes.io/hostname":"{{ stable_node }}"}}]'
+
+    - name: Pin CoreDNS to {{ stable_node }}
+      command: >
+        kubectl patch deployment coredns -n kube-system
+        --type=json
+        -p='[{"op":"add","path":"/spec/template/spec/nodeSelector","value":{"kubernetes.io/hostname":"{{ stable_node }}"}}]'
+
+    - name: Apply RBAC for ArgoCD
+      command: kubectl apply -f {{ repo_root }}/p1-pcam-deployment/k8s/rbac.yaml
+
+    - name: Apply pcam ArgoCD Application CR
+      command: kubectl apply -f {{ repo_root }}/p1-pcam-deployment/k8s/argocd-application.yaml
+
+    - name: Wait for ArgoCD server to be ready
+      command: >
+        kubectl wait deployment argocd-server -n {{ argocd_namespace }}
+        --for=condition=Available --timeout=120s

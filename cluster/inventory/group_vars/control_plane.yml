@@ -1,0 +1,7 @@
+# Control-plane specific vars
+node_role: control-plane
+
+# kubeadm API server extra SANs — added Tailscale IP for remote kubectl
+apiserver_extra_sans:
+  - "100.123.23.6"   # Tailscale IP (added 2026-03-xx, see docs/deployment-troubleshooting.md §step17)
+  - "192.168.1.184"  # LAN IP (already in default SANs but listed for clarity)

@@ -1,0 +1,38 @@
+---
+# kubeadm/tasks/main.yml — Install kubeadm, kubelet, kubectl
+# Pins to k8s_version to prevent unintended upgrades via apt upgrade.
+
+- name: Add Kubernetes apt signing key
+  apt_key:
+    url: "https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/Release.key"
+    state: present
+
+- name: Add Kubernetes apt repository
+  apt_repository:
+    repo: "deb https://pkgs.k8s.io/core:/stable:/v{{ k8s_minor }}/deb/ /"
+    state: present
+    filename: kubernetes
+
+- name: Install kubeadm, kubelet, kubectl
+  apt:
+    name:
+      - "kubeadm={{ k8s_version }}-*"
+      - "kubelet={{ k8s_version }}-*"
+      - "kubectl={{ k8s_version }}-*"
+    state: present
+    update_cache: true
+
+- name: Pin kubeadm, kubelet, kubectl (prevent accidental upgrade)
+  dpkg_selections:
+    name: "{{ item }}"
+    selection: hold
+  loop:
+    - kubeadm
+    - kubelet
+    - kubectl
+
+- name: Enable and start kubelet
+  systemd:
+    name: kubelet
+    state: started
+    enabled: true

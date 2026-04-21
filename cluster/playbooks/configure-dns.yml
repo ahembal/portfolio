@@ -1,0 +1,21 @@
+---
+# configure-dns.yml — Install systemd-resolved drop-in on all nodes
+#
+# Points each node's DNS resolver to the MAAS-managed bind9 at 192.168.1.90.
+# Without this, nodes resolve cluster service names via the upstream DNS
+# (1.1.1.1) which has no knowledge of in-cluster names — breaking ArgoCD's
+# ability to reach the GitHub API and intra-cluster service discovery.
+#
+# This playbook codifies the manual fix applied on 2026-04-20:
+#   /etc/systemd/resolved.conf.d/maas-dns.conf with DNS=192.168.1.90
+#
+# Usage:
+#   ansible-playbook -i inventory/hosts.ini playbooks/configure-dns.yml
+#
+# Idempotent: safe to re-run. Will reload systemd-resolved if config changes.
+
+- name: Configure DNS on all cluster nodes
+  hosts: k8s_cluster
+  become: true
+  roles:
+    - dns
