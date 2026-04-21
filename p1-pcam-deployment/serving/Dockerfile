@@ -23,6 +23,10 @@
 # - Trivy/Snyk scans show dramatically fewer CVEs vs slim.
 # - Image is ~60 MB smaller than python:3.11-slim.
 #
+# Compliance: NIST SP 800-190 §4.1 (minimal base image), ISO 27001:2022 A.8.8
+# (management of technical vulnerabilities — reduce patchable surface),
+# CIS Docker Benchmark 4.1 (do not use privileged containers / minimal image).
+#
 # Trade-off: no shell means `kubectl exec` debugging drops to raw python -c.
 # Acceptable for a production-style portfolio deployment — use an ephemeral
 # debug sidecar (kubectl debug) if you need a shell in the pod.
@@ -58,6 +62,10 @@ RUN pip install --upgrade pip && \
 # Distroless Python image — no shell, no package manager, no OS utilities.
 # UID 65532 is the "nonroot" user that distroless ships by default.
 # We do not need useradd here — the user already exists in the base image.
+#
+# Compliance: CIS K8s Benchmark 5.2.7 (do not admit root containers),
+# NIST SP 800-190 §4.1, ISO 27001:2022 A.8.9 (configuration management —
+# non-privileged runtime). Mirrored by runAsUser: 65532 in deployment.yaml.
 FROM gcr.io/distroless/python3-debian12:nonroot
 
 WORKDIR /app

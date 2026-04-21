@@ -1,5 +1,10 @@
 # k8s/rbac.yaml — least-privilege RBAC for the pcam-inference workload.
 #
+# Compliance: ISO 27001:2022 A.9 (access control), A.8.9 (configuration management),
+# CIS K8s Benchmark 5.1.5–5.1.6 (no default SA token, no auto-mount),
+# NIST SP 800-190 §4.3 (orchestrator least-privilege), NIST CSF 2.0 Protect (PR.AC).
+# Full control mapping: docs/security-compliance.md §4 and §7.
+#
 # Why a dedicated ServiceAccount instead of using the default SA?
 # The default ServiceAccount in every namespace has no RBAC bindings by default,
 # but it does get an auto-mounted token that can be used to query the API server.
@@ -41,6 +46,7 @@ automountServiceAccountToken: false
 # automountServiceAccountToken: false — the inference service never queries
 # the K8s API, so it does not need a token. Disabling the auto-mount removes
 # the token from the pod filesystem entirely, shrinking the attack surface.
+# Compliance: CIS K8s Benchmark 5.1.5, ISO 27001:2022 A.9.2 (user access management).
 
 ---
 # ServiceAccount used by ArgoCD to manage resources in the pcam namespace.
