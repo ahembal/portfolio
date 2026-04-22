@@ -21,9 +21,7 @@ own event loop per task and mixing asyncio here adds complexity without benefit.
 
 import hashlib
 import os
-import sys
 import time
-from pathlib import Path
 
 import magic
 from celery import Celery
@@ -32,11 +30,11 @@ from prometheus_client import Counter, Histogram
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from src.storage.db import FileMetadata
+from src.storage.s3 import RGWConfig, build_s3_key, ensure_bucket, get_s3_client, upload_bytes
+
 log = get_task_logger(__name__)
 
-# Worker-side metrics — published to the same /metrics endpoint via shared
-# prometheus_client registry. The worker process exposes these when the API
-# pod shares the process, or via a separate metrics port if workers run standalone.
 JOB_STATUS_TOTAL = Counter(
     "ingest_jobs_total",
     "Total completed jobs by final status",
@@ -47,13 +45,6 @@ JOB_DURATION = Histogram(
     "End-to-end job processing time from task start to DB update",
     buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
 )
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
-
-from infra.ceph_rgw.boto3_config import RGWConfig, get_s3_client  # noqa: E402
-
-from src.storage.db import FileMetadata  # noqa: E402
-from src.storage.s3 import build_s3_key, ensure_bucket, upload_bytes  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Celery app

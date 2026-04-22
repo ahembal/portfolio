@@ -13,8 +13,39 @@ co-located in time — useful for lifecycle policies and batch processing later.
 """
 
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+
+import boto3
+from botocore.client import Config
+
+
+@dataclass(frozen=True)
+class RGWConfig:
+    endpoint: str
+    access_key: str
+    secret_key: str
+    region: str = "default"
+
+    def __post_init__(self):
+        if not self.endpoint:
+            raise ValueError("RGWConfig.endpoint must not be empty")
+        if not self.access_key:
+            raise ValueError("RGWConfig.access_key must not be empty")
+        if not self.secret_key:
+            raise ValueError("RGWConfig.secret_key must not be empty")
+
+
+def get_s3_client(config: RGWConfig):
+    return boto3.client(
+        "s3",
+        endpoint_url=config.endpoint,
+        aws_access_key_id=config.access_key,
+        aws_secret_access_key=config.secret_key,
+        region_name=config.region,
+        config=Config(signature_version="s3v4"),
+    )
 
 
 def build_s3_key(job_id: str, filename: str) -> str:
