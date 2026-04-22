@@ -31,7 +31,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from src.storage.db import FileMetadata
-from src.storage.s3 import RGWConfig, build_s3_key, ensure_bucket, get_s3_client, upload_bytes
+from src.storage.s3 import (
+    RGWConfig,
+    build_s3_key,
+    ensure_bucket,
+    get_s3_client,
+    upload_bytes,
+)
 
 log = get_task_logger(__name__)
 
