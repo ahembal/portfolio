@@ -6,3 +6,4 @@ pytest-mock==3.14.0
 httpx==0.28.1
 testcontainers[postgresql]==4.9.2
 ruff==0.11.6
+pytest-cov==6.1.0
