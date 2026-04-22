@@ -35,8 +35,8 @@
 ### Phase 4 — CI/CD
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 15 | GitHub Actions pipeline | ⬜ Todo | pytest → docker build × 2 (api image + worker image) → push GHCR → update values.yaml with new tags. Two images because api and worker have different runtime dependencies and get rebuilt independently. |
-| 16 | ArgoCD Application CR | ⬜ Todo | Watches helm/metadata-ingestion/ on main. Auto-deploys when values.yaml tag changes. Reuses the existing ArgoCD instance from p1 — shows GitOps scales to multiple applications on the same cluster. |
+| 15 | .github/workflows/p2-ci.yml | ✅ Done | lint-and-test (ruff + pytest/testcontainers) → build-api + build-worker in parallel → update-tags writes SHAs back to values.yaml. |
+| 16 | k8s/argocd-application.yaml | ✅ Done | Done in Phase 3 — watches helm/metadata-ingestion/ on main, CreateNamespace=true. |
 
 ### Phase 5 — Observability + Docs
 | # | Step | Status | What & Why |
@@ -53,6 +53,6 @@
 Phase 1  [██████] 6/6  ✅ Done
 Phase 2  [████]   4/4  ✅ Done
 Phase 3  [██░░]   2/4  ← deploy + smoke test pending
-Phase 4  [░░]     0/2
-Phase 5  [░░░]    0/3
+Phase 4  [██]     2/2  ✅ Done
+Phase 5  [░░░]    0/3  ← next (Prometheus metrics + Grafana + Q6 already written)
 ```
