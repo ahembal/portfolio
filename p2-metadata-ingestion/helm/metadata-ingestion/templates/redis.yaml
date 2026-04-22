@@ -1,0 +1,49 @@
+# Redis as a plain Deployment — stateless broker, no persistent storage needed.
+# Lost jobs on Redis restart are acceptable: Celery re-queues tasks with
+# task_reject_on_worker_lost=True and task_acks_late=True.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "metadata.fullname" . }}-redis
+  labels:
+    {{- include "metadata.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "metadata.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: redis
+  template:
+    metadata:
+      labels:
+        {{- include "metadata.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: redis
+    spec:
+      containers:
+        - name: redis
+          image: {{ .Values.redis.image }}
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.redis.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: metadata-redis
+  labels:
+    {{- include "metadata.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: 6379
+  selector:
+    {{- include "metadata.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis

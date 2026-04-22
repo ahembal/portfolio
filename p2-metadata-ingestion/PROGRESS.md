@@ -27,10 +27,10 @@
 ### Phase 3 — Helm + K8s
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 11 | helm/metadata-ingestion/ chart | ⬜ Todo | Two deployments (api + worker), one service, configmap, HPA on worker CPU. Worker and API scale independently — during a backlog the worker replicas can spike while the API stays at 1. This is why they're separate deployments. |
-| 12 | Sealed Secrets | ⬜ Todo | Seal Postgres password and RGW credentials with kubeseal. Same pattern as p1 — plaintext credentials in git is never acceptable even in a homelab portfolio. |
-| 13 | Deploy to homelab | ⬜ Todo | `helm install metadata ./helm/metadata-ingestion -n metadata`. Smoke test: port-forward the API and POST a file. |
-| 14 | Smoke test | ⬜ Todo | POST /ingest via port-forward → poll /status/{id} until done → verify record in Postgres. End-to-end confirmation that all four services (API, worker, Redis, Postgres) communicate correctly in K8s. |
+| 11 | helm/metadata-ingestion/ chart | ✅ Done | api + worker deployments, service, configmap, HPA (worker), Postgres StatefulSet + PVC, Redis deployment, ArgoCD Application CR. |
+| 12 | k8s/seal-secrets.sh | ✅ Done | Script to generate SealedSecrets for RGW creds + Postgres password. Run once per cluster before deploying. |
+| 13 | Deploy to homelab | ⬜ Todo | Apply sealed secrets → `helm install` or ArgoCD sync → verify pods Running. |
+| 14 | Smoke test | ⬜ Todo | POST /ingest via port-forward → poll /status/{id} until done. |
 
 ### Phase 4 — CI/CD
 | # | Step | Status | What & Why |
@@ -52,7 +52,7 @@
 ```
 Phase 1  [██████] 6/6  ✅ Done
 Phase 2  [████]   4/4  ✅ Done
-Phase 3  [░░░░]   0/4  ← next
+Phase 3  [██░░]   2/4  ← deploy + smoke test pending
 Phase 4  [░░]     0/2
 Phase 5  [░░░]    0/3
 ```

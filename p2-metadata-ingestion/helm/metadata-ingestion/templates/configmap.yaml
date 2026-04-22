@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "metadata.fullname" . }}-config
+  labels:
+    {{- include "metadata.labels" . | nindent 4 }}
+data:
+  RGW_ENDPOINT: {{ .Values.config.rgwEndpoint | quote }}
+  STORAGE_BUCKET: {{ .Values.config.storageBucket | quote }}
+  REDIS_URL: {{ .Values.config.redisUrl | quote }}
+  DATABASE_URL: "postgresql+asyncpg://meta:$(POSTGRES_PASSWORD)@metadata-postgres:5432/metadata"

@@ -1,0 +1,106 @@
+# metadata-ingestion Helm values
+# All tunables in one place — no template edits needed for env changes.
+
+image:
+  api:
+    repository: ghcr.io/ahembal/metadata-api
+    tag: latest
+    pullPolicy: IfNotPresent
+  worker:
+    repository: ghcr.io/ahembal/metadata-worker
+    tag: latest
+    pullPolicy: IfNotPresent
+
+imagePullSecrets:
+  - name: ghcr-pull-secret
+
+# ---------------------------------------------------------------------------
+# API deployment
+# ---------------------------------------------------------------------------
+api:
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  service:
+    type: ClusterIP
+    port: 80
+    targetPort: 8000
+  readinessProbe:
+    initialDelaySeconds: 10
+    periodSeconds: 10
+  livenessProbe:
+    initialDelaySeconds: 20
+    periodSeconds: 15
+
+# ---------------------------------------------------------------------------
+# Worker deployment
+# ---------------------------------------------------------------------------
+worker:
+  replicaCount: 1
+  concurrency: 4     # Celery worker threads per pod
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+
+# ---------------------------------------------------------------------------
+# HPA — scale workers on CPU (queue-depth HPA requires prometheus-adapter)
+# ---------------------------------------------------------------------------
+hpa:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 6
+  targetCPUUtilizationPercentage: 70
+
+# ---------------------------------------------------------------------------
+# Postgres (in-cluster StatefulSet)
+# ---------------------------------------------------------------------------
+postgres:
+  image: postgres:16-alpine
+  storage: 5Gi
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+
+# ---------------------------------------------------------------------------
+# Redis (in-cluster Deployment)
+# ---------------------------------------------------------------------------
+redis:
+  image: redis:7-alpine
+  resources:
+    requests:
+      cpu: 50m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi
+
+# ---------------------------------------------------------------------------
+# Application config (non-sensitive — goes in ConfigMap)
+# ---------------------------------------------------------------------------
+config:
+  rgwEndpoint: "http://192.168.1.16"
+  storageBucket: "metadata-files"
+  redisUrl: "redis://metadata-redis:6379/0"
+
+# ---------------------------------------------------------------------------
+# Secret references (sensitive — values come from SealedSecrets)
+# ---------------------------------------------------------------------------
+credentialsSecret: metadata-credentials   # RGW_ACCESS_KEY + RGW_SECRET_KEY
+postgresSecret: metadata-postgres-secret  # POSTGRES_PASSWORD
+
+ingress:
+  enabled: false
+  host: metadata.homelab.local

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: metadata-ingestion
+description: Async file metadata ingestion — FastAPI + Celery + Postgres + Ceph RGW
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
