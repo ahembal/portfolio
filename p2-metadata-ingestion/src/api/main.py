@@ -28,11 +28,11 @@ from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.responses import Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
+    REGISTRY,
     Counter,
     Gauge,
     Histogram,
     generate_latest,
-    REGISTRY,
 )
 from sqlalchemy import func, select
 
@@ -43,7 +43,12 @@ from src.api.schemas import (
     IngestResponse,
     JobStatus,
 )
-from src.storage.db import FileMetadata, create_tables, get_engine, get_session_factory
+from src.storage.db import (
+    FileMetadata,
+    create_tables,
+    get_engine,
+    get_session_factory,
+)
 from src.workers.tasks import process_file
 
 # ---------------------------------------------------------------------------
@@ -91,7 +96,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Metadata Ingestion Service",
-    description="Async file ingestion pipeline with Celery workers and Postgres metadata store.",
+    description="Async file ingestion pipeline with Celery workers and Postgres metadata store.",  # noqa: E501
     version="0.1.0",
     lifespan=lifespan,
 )
