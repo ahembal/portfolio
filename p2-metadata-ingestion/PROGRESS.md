@@ -1,6 +1,6 @@
 # Project 2 — Metadata Ingestion Service
 ## Progress Tracker
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-22*
 
 ---
 
@@ -9,12 +9,12 @@
 ### Phase 1 — Local stack
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | docker-compose.yml | ⬜ Todo | Brings up API + Celery worker + Redis + Postgres in one command. Local dev requires all four services running simultaneously — docker compose is the only sane way to orchestrate that without a cluster. |
-| 2 | src/storage/db.py | ⬜ Todo | SQLAlchemy async models for FileMetadata (id, filename, content_type, size_bytes, sha256, s3_key, status, timestamps). The schema is the contract between the API and the worker — defining it first prevents mismatches later. |
-| 3 | src/storage/s3.py | ⬜ Todo | boto3 wrapper for Ceph RGW. Reuses the pattern from `infra/ceph-rgw/boto3_config.py`. Abstracts bucket/key operations so the worker doesn't care whether the backend is RGW or AWS S3. |
-| 4 | src/api/schemas.py | ⬜ Todo | Pydantic models for request/response: IngestRequest, IngestResponse (job_id, status), StatusResponse, FileMetadataOut. These are the API's type contract — wrong schema means wrong client behaviour at every layer. |
-| 5 | src/api/main.py | ⬜ Todo | FastAPI app with POST /ingest, GET /status/{job_id}, GET /files, GET /health, GET /metrics. /ingest queues a Celery task and returns immediately (async pattern) — the worker does the heavy lifting so the API stays fast under load. |
-| 6 | src/workers/tasks.py | ⬜ Todo | Celery tasks: compute SHA-256 checksum, detect MIME type, upload file to RGW, update Postgres status (pending → processing → done/failed). Processing is in the worker, not the API, so the pipeline scales horizontally by adding worker replicas. |
+| 1 | docker-compose.yml | ✅ Done | API + worker + Redis + Postgres with healthchecks — starts in dependency order. |
+| 2 | src/storage/db.py | ✅ Done | SQLAlchemy async (asyncpg), FileMetadata with UUID PK, status CHECK constraint, server-side timestamps. |
+| 3 | src/storage/s3.py | ✅ Done | boto3 upload wrapper, deterministic key schema `uploads/{yyyy}/{mm}/{dd}/{job_id}/{filename}`. |
+| 4 | src/api/schemas.py | ✅ Done | Pydantic v2 — IngestResponse, JobStatus, FileMetadataOut, FileListResponse, HealthResponse. |
+| 5 | src/api/main.py | ✅ Done | POST /ingest (202), GET /status/{id}, /files, /health, /metrics. Prometheus counters + histogram. |
+| 6 | src/workers/tasks.py | ✅ Done | SHA-256, python-magic MIME detection, RGW upload, status transitions, 3× retry / 30s backoff. |
 
 ### Phase 2 — Tests
 | # | Step | Status | What & Why |
@@ -50,8 +50,8 @@
 ## Quick status
 
 ```
-Phase 1  [░░░░░░] 0/6  ← start here
-Phase 2  [░░░░]   0/4
+Phase 1  [██████] 6/6  ✅ Done
+Phase 2  [░░░░]   0/4  ← next
 Phase 3  [░░░░]   0/4
 Phase 4  [░░]     0/2
 Phase 5  [░░░]    0/3

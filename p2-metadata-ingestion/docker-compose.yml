@@ -1,0 +1,83 @@
+services:
+
+  api:
+    build:
+      context: .
+      target: runtime
+    command: uvicorn src.api.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://meta:meta@postgres:5432/metadata
+      REDIS_URL: redis://redis:6379/0
+      RGW_ENDPOINT: ${RGW_ENDPOINT:-http://192.168.1.16}
+      RGW_ACCESS_KEY: ${RGW_ACCESS_KEY}
+      RGW_SECRET_KEY: ${RGW_SECRET_KEY}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-metadata-files}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - backend
+
+  worker:
+    build:
+      context: .
+      target: runtime
+    command: celery -A src.workers.tasks worker --loglevel=info --concurrency=4
+    environment:
+      DATABASE_URL: postgresql+asyncpg://meta:meta@postgres:5432/metadata
+      REDIS_URL: redis://redis:6379/0
+      RGW_ENDPOINT: ${RGW_ENDPOINT:-http://192.168.1.16}
+      RGW_ACCESS_KEY: ${RGW_ACCESS_KEY}
+      RGW_SECRET_KEY: ${RGW_SECRET_KEY}
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-metadata-files}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    networks:
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: meta
+      POSTGRES_PASSWORD: meta
+      POSTGRES_DB: metadata
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U meta -d metadata"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - backend
+
+volumes:
+  pgdata:
+
+networks:
+  backend:
