@@ -19,10 +19,10 @@
 ### Phase 2 — Tests
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 7 | tests/test_ingestion.py skeleton | ⬜ Todo | pytest setup with fixtures for test DB and mock Celery (eager mode) and mock S3. The test infrastructure determines what's testable — define it before writing individual tests. |
-| 8 | Test: POST /ingest → job created | ⬜ Todo | Confirms the API creates a DB record, queues a Celery task, and returns a job_id. The most important happy-path test — if this fails, nothing else matters. |
-| 9 | Test: worker status transitions | ⬜ Todo | Confirms the worker moves the job through pending → processing → done and writes the sha256 and s3_key to the DB. Validates the async pipeline end-to-end without a real S3 or Redis. |
-| 10 | Test: /health returns 200 | ⬜ Todo | /health checks DB connectivity and Redis connectivity — tests that both are reachable in the test environment. Kubernetes probes this endpoint; if it's wrong the pod never gets traffic. |
+| 7 | tests/conftest.py | ✅ Done | pytest fixtures: Postgres via testcontainers, async engine, mock Redis, httpx AsyncClient with injected app_state, mock S3, env monkeypatching. |
+| 8 | Test: POST /ingest → job created | ✅ Done | 3 tests: 202 + UUID returned, DB record status=pending, Celery .delay called with correct job_id. |
+| 9 | Test: worker status transitions | ✅ Done | Worker → done (sha256 written, s3_key set, put_object called); worker → failed (S3 error sets status=failed + error_msg). |
+| 10 | Test: /health + /files + /status | ✅ Done | /health ok and degraded paths; /files pagination and status filter; /status 200 and 404. |
 
 ### Phase 3 — Helm + K8s
 | # | Step | Status | What & Why |
@@ -51,8 +51,8 @@
 
 ```
 Phase 1  [██████] 6/6  ✅ Done
-Phase 2  [░░░░]   0/4  ← next
-Phase 3  [░░░░]   0/4
+Phase 2  [████]   4/4  ✅ Done
+Phase 3  [░░░░]   0/4  ← next
 Phase 4  [░░]     0/2
 Phase 5  [░░░]    0/3
 ```
