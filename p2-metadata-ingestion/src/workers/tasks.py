@@ -22,12 +22,31 @@ own event loop per task and mixing asyncio here adds complexity without benefit.
 import hashlib
 import os
 import sys
+import time
 from pathlib import Path
 
 import magic
 from celery import Celery
+from celery.utils.log import get_task_logger
+from prometheus_client import Counter, Histogram
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
+
+log = get_task_logger(__name__)
+
+# Worker-side metrics — published to the same /metrics endpoint via shared
+# prometheus_client registry. The worker process exposes these when the API
+# pod shares the process, or via a separate metrics port if workers run standalone.
+JOB_STATUS_TOTAL = Counter(
+    "ingest_jobs_total",
+    "Total completed jobs by final status",
+    ["status"],
+)
+JOB_DURATION = Histogram(
+    "ingest_job_duration_seconds",
+    "End-to-end job processing time from task start to DB update",
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0],
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
@@ -96,6 +115,7 @@ def process_file(
     (S3 timeout, DB connectivity blip). Permanent failures (e.g. corrupt file)
     set status=failed with an error message.
     """
+    t0 = time.perf_counter()
     session = _get_sync_session()
     try:
         # Mark processing
@@ -136,6 +156,8 @@ def process_file(
         record.status = "done"
         session.commit()
 
+        JOB_DURATION.observe(time.perf_counter() - t0)
+        JOB_STATUS_TOTAL.labels(status="done").inc()
         return {"status": "done", "job_id": job_id, "sha256": sha256}
 
     except Exception as exc:
@@ -149,6 +171,8 @@ def process_file(
         except Exception:
             pass
 
+        JOB_DURATION.observe(time.perf_counter() - t0)
+        JOB_STATUS_TOTAL.labels(status="failed").inc()
         raise self.retry(exc=exc)
 
     finally:

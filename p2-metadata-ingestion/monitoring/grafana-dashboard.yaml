@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: metadata-ingestion-dashboard
+  namespace: monitoring
+  labels:
+    grafana_dashboard: "1"   # Grafana sidecar auto-discovers ConfigMaps with this label
+data:
+  metadata-ingestion.json: |
+    {
+      "title": "Metadata Ingestion Service",
+      "uid": "metadata-ingestion",
+      "tags": ["p2", "metadata", "celery"],
+      "refresh": "15s",
+      "panels": [
+        {
+          "title": "Ingest Rate (req/s)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 0, "w": 8, "h": 8 },
+          "targets": [{
+            "expr": "rate(ingest_requests_total[1m])",
+            "legendFormat": "{{status}}"
+          }]
+        },
+        {
+          "title": "Queue Depth",
+          "type": "timeseries",
+          "gridPos": { "x": 8, "y": 0, "w": 8, "h": 8 },
+          "targets": [{
+            "expr": "ingest_queue_depth",
+            "legendFormat": "pending tasks"
+          }]
+        },
+        {
+          "title": "Job Completion Rate (jobs/s)",
+          "type": "timeseries",
+          "gridPos": { "x": 16, "y": 0, "w": 8, "h": 8 },
+          "targets": [{
+            "expr": "rate(ingest_jobs_total[1m])",
+            "legendFormat": "{{status}}"
+          }]
+        },
+        {
+          "title": "Job Duration p50 / p95 / p99 (s)",
+          "type": "timeseries",
+          "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+          "targets": [
+            {
+              "expr": "histogram_quantile(0.50, rate(ingest_job_duration_seconds_bucket[5m]))",
+              "legendFormat": "p50"
+            },
+            {
+              "expr": "histogram_quantile(0.95, rate(ingest_job_duration_seconds_bucket[5m]))",
+              "legendFormat": "p95"
+            },
+            {
+              "expr": "histogram_quantile(0.99, rate(ingest_job_duration_seconds_bucket[5m]))",
+              "legendFormat": "p99"
+            }
+          ]
+        },
+        {
+          "title": "API Request Latency p95 (ms)",
+          "type": "timeseries",
+          "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+          "targets": [{
+            "expr": "histogram_quantile(0.95, rate(ingest_request_latency_ms_bucket[5m]))",
+            "legendFormat": "p95 latency"
+          }]
+        },
+        {
+          "title": "Worker Replicas (HPA)",
+          "type": "stat",
+          "gridPos": { "x": 0, "y": 16, "w": 6, "h": 4 },
+          "targets": [{
+            "expr": "kube_deployment_status_replicas_ready{deployment=~\".*metadata.*worker.*\"}",
+            "legendFormat": "ready"
+          }]
+        },
+        {
+          "title": "Failed Jobs (total)",
+          "type": "stat",
+          "gridPos": { "x": 6, "y": 16, "w": 6, "h": 4 },
+          "targets": [{
+            "expr": "ingest_jobs_total{status=\"failed\"}",
+            "legendFormat": "failed"
+          }]
+        }
+      ]
+    }

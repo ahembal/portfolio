@@ -29,6 +29,7 @@ from fastapi.responses import Response
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     Counter,
+    Gauge,
     Histogram,
     generate_latest,
     REGISTRY,
@@ -59,6 +60,13 @@ INGEST_LATENCY = Histogram(
     "Request latency in milliseconds",
     ["endpoint"],
     buckets=[5, 10, 25, 50, 100, 250, 500, 1000],
+)
+# Queue depth is a Gauge, not a Counter, because it goes up AND down.
+# Updated on every /metrics scrape by querying Redis directly — accurate
+# at scrape time without needing a background polling loop.
+QUEUE_DEPTH = Gauge(
+    "ingest_queue_depth",
+    "Number of tasks currently waiting in the Celery queue (Redis list length)",
 )
 
 # ---------------------------------------------------------------------------
@@ -196,4 +204,11 @@ async def health():
 
 @app.get("/metrics")
 async def metrics():
+    # Update queue depth at scrape time — Celery's default queue is a Redis
+    # list named "celery". llen returns 0 if the key doesn't exist yet.
+    try:
+        depth = await app_state["redis"].llen("celery")
+        QUEUE_DEPTH.set(depth)
+    except Exception:
+        pass  # leave gauge at last known value rather than crashing the scrape
     return Response(generate_latest(REGISTRY), media_type=CONTENT_TYPE_LATEST)

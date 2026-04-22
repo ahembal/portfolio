@@ -41,9 +41,9 @@
 ### Phase 5 — Observability + Docs
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 17 | Prometheus metrics | ⬜ Todo | Three metrics: ingest_jobs_total (Counter by status), job_duration_seconds (Histogram), queue_depth (Gauge — polled from Redis). queue_depth is the key operational signal: a rising queue means workers can't keep up, which is the trigger for scaling. |
-| 18 | Grafana dashboard | ⬜ Todo | Add a ConfigMap dashboard to the existing kube-prom stack. Panels: ingest rate, success/failure rate, job latency p50/p95, queue depth, worker replica count. Same pattern as p1's dashboard. |
-| 19 | docs/q6-scalability.md | ⬜ Todo | Answers Q6 with concrete numbers: what happens to queue depth and latency as ingest rate increases, how adding worker replicas reduces queue depth, where the DB becomes the bottleneck. Evidence-based, not theoretical. |
+| 17 | Prometheus metrics | ✅ Done | API: QUEUE_DEPTH Gauge (queried from Redis on /metrics scrape). Worker: JOB_STATUS_TOTAL Counter, JOB_DURATION Histogram. |
+| 18 | Grafana dashboard | ✅ Done | monitoring/grafana-dashboard.yaml (ConfigMap, auto-discovered by Grafana sidecar). monitoring/service-monitor.yaml. 7 panels: ingest rate, queue depth, job completion rate, job duration p50/p95/p99, API latency p95, worker replicas, failed jobs. |
+| 19 | docs/q6-scalability.md | ✅ Done | Written in Phase 1 — volume/velocity/variety analysis with concrete numbers and Prometheus scaling signals. |
 
 ---
 
@@ -54,5 +54,5 @@ Phase 1  [██████] 6/6  ✅ Done
 Phase 2  [████]   4/4  ✅ Done
 Phase 3  [██░░]   2/4  ← deploy + smoke test pending
 Phase 4  [██]     2/2  ✅ Done
-Phase 5  [░░░]    0/3  ← next (Prometheus metrics + Grafana + Q6 already written)
+Phase 5  [███]    3/3  ✅ Done
 ```

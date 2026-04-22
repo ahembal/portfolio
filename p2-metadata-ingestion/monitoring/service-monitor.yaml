@@ -1,0 +1,17 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: metadata-ingestion
+  namespace: metadata
+  labels:
+    app.kubernetes.io/name: metadata-ingestion
+    release: kube-prom  # must match serviceMonitorSelector matchLabels on the prometheus-operator
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: metadata-ingestion
+      app.kubernetes.io/component: api
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 15s
