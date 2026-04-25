@@ -144,6 +144,7 @@ async def test_worker_sets_failed_on_s3_error(session_factory, mock_s3):
         process_file.apply(
             args=[job_id, "broken.bin", "application/octet-stream", b"\x00\x01\x02\x03"],
             retries=3,  # exhaust retries immediately in test
+            throw=True,
         )
 
     async with session_factory() as session:
@@ -240,8 +241,6 @@ async def test_files_status_filter(client, session_factory):
 @pytest.mark.asyncio
 async def test_health_ok(client, mock_redis):
     """GET /health returns status=ok when DB and Redis are reachable."""
-    mock_redis.ping = MagicMock(return_value=True)
-
     response = await client.get("/health")
 
     assert response.status_code == 200

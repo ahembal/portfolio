@@ -1,6 +1,6 @@
 # Project 2 — Metadata Ingestion Service
 ## Progress Tracker
-*Last updated: 2026-04-22*
+*Last updated: 2026-04-24*
 
 ---
 
@@ -44,6 +44,9 @@
 | 17 | Prometheus metrics | ✅ Done | API: QUEUE_DEPTH Gauge (queried from Redis on /metrics scrape). Worker: JOB_STATUS_TOTAL Counter, JOB_DURATION Histogram. |
 | 18 | Grafana dashboard | ✅ Done | monitoring/grafana-dashboard.yaml (ConfigMap, auto-discovered by Grafana sidecar). monitoring/service-monitor.yaml. 7 panels: ingest rate, queue depth, job completion rate, job duration p50/p95/p99, API latency p95, worker replicas, failed jobs. |
 | 19 | docs/q6-scalability.md | ✅ Done | Written in Phase 1 — volume/velocity/variety analysis with concrete numbers and Prometheus scaling signals. |
+| 20 | docs/architecture.md | ✅ Done | Component roles, full data flow diagram, why Redis + Postgres, failure handling, scaling. |
+| 21 | docs/design-decisions.md | ✅ Done | Rationale behind async queue, testcontainers, single Dockerfile, MIME detection from bytes, task_acks_late. |
+| 22 | docs/runbook.md | ✅ Done | Debugging guide: stuck jobs, S3 errors, queue depth checks, Prometheus metrics reference. |
 
 ---
 
@@ -54,5 +57,5 @@ Phase 1  [██████] 6/6  ✅ Done
 Phase 2  [████]   4/4  ✅ Done
 Phase 3  [██░░]   2/4  ← deploy + smoke test pending
 Phase 4  [██]     2/2  ✅ Done
-Phase 5  [███]    3/3  ✅ Done
+Phase 5  [██████] 6/6  ✅ Done
 ```

@@ -12,7 +12,7 @@ public responses).
 from datetime import datetime
 from uuid import UUID
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class IngestResponse(BaseModel):
@@ -35,7 +35,7 @@ class JobStatus(BaseModel):
 
 
 class FileMetadataOut(BaseModel):
-    job_id: UUID
+    job_id: UUID = Field(validation_alias="id")
     filename: str
     content_type: str | None
     size_bytes: int | None

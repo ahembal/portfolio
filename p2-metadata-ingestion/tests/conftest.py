@@ -15,7 +15,7 @@ Strategy:
 """
 
 import os
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 import pytest_asyncio
@@ -69,8 +69,8 @@ async def session_factory(db_engine):
 @pytest.fixture
 def mock_redis():
     redis = MagicMock()
-    redis.ping = MagicMock(return_value=True)
-    redis.aclose = MagicMock(return_value=None)
+    redis.ping = AsyncMock(return_value=True)
+    redis.aclose = AsyncMock(return_value=None)
     return redis
 
 
