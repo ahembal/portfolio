@@ -79,3 +79,55 @@ the I/O cost independently.
   `/metrics` scrape) drives the HPA on the worker deployment.
 - **API and worker scale independently**: the API is stateless; the worker is I/O-bound.
   Under a burst of uploads, the queue grows and HPA adds workers automatically.
+
+## CI/CD pipeline
+
+Every push to `main` that touches `p2-metadata-ingestion/` runs four GitHub
+Actions jobs in sequence:
+
+```
+lint-and-test
+  ruff (import sort, line length, unused imports)
+  pytest (11 tests, real Postgres via testcontainers, mock Redis + S3)
+        │
+        ├───────────────────────────┐
+        ▼                           ▼
+build-api                     build-worker
+  docker build                  docker build
+  push metadata-api:<sha>       push metadata-worker:<sha>
+  push metadata-api:latest      push metadata-worker:latest
+  → GHCR                        → GHCR
+        │                           │
+        └───────────────────────────┘
+                      │
+                      ▼
+                update-tags
+          writes <sha> into
+          helm/values.yaml,
+          commits + pushes
+                      │
+                      ▼
+              ArgoCD detects drift
+              deploys new images
+              to homelab cluster
+```
+
+**Why two separate images?**
+
+The API and worker run the same Python code from the same Dockerfile, but
+start with different commands:
+- API: `uvicorn src.api.main:app`
+- Worker: `celery -A src.workers.tasks worker`
+
+Separate image tags mean a worker-only fix does not redeploy the API pods,
+and vice versa. They also scale independently in Kubernetes — the HPA adds
+worker replicas when the queue grows without touching the API deployment.
+
+**GHCR** (GitHub Container Registry) is GitHub's built-in Docker registry.
+Images are pushed there automatically on every green build and referenced by
+tag (short SHA) in `helm/values.yaml`.
+
+**ArgoCD** watches the `helm/metadata-ingestion/` directory on the `main`
+branch. When `update-tags` commits a new SHA into `values.yaml`, ArgoCD sees
+the drift between the repo and the cluster and syncs — pulling and deploying
+the new images without any manual `kubectl` commands.
