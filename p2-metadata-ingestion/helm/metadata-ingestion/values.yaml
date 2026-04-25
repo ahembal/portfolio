@@ -4,11 +4,11 @@
 image:
   api:
     repository: ghcr.io/ahembal/metadata-api
-    tag: latest
+    tag: "96a9259"
     pullPolicy: IfNotPresent
   worker:
     repository: ghcr.io/ahembal/metadata-worker
-    tag: latest
+    tag: "96a9259"
     pullPolicy: IfNotPresent
 
 imagePullSecrets:
