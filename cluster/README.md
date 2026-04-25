@@ -11,8 +11,22 @@ Ansible playbooks and roles for the homelab Kubernetes cluster.
 | sought-perch | worker (Flannel issue) | 192.168.1.16 | Ubuntu 24.04.3 | 6.8.0-110 |
 
 **Note on sought-perch:** Had a Flannel VXLAN bug (kernel 6.8.0-101) causing CNI sandbox
-rebuilds every ~7 minutes — all pods on the node received SIGTERM. Fixed in 6.8.0-110
-but critical workloads (ArgoCD, CoreDNS) remain pinned to quick-thrush as a precaution.
+rebuilds every ~7 minutes — all pods on the node received SIGTERM. Upgraded to 6.8.0-110
+but liveness probe failures persist on the node — HTTP probes from pods on sought-perch
+fail intermittently, causing Kubernetes to restart healthy pods (exit code 0). Root cause
+not yet confirmed (Flannel VXLAN residual, NIC driver, or MTU mismatch).
+
+**Workaround in place:** ArgoCD, CoreDNS, Sealed Secrets controller, and kube-prometheus
+are all pinned to quick-thrush via nodeSelector. New workloads should also avoid
+sought-perch until this is resolved.
+
+**TODO — fix sought-perch properly:**
+1. Check Flannel MTU: `kubectl exec -n kube-flannel <flannel-pod-on-sought-perch> -- cat /run/flannel/subnet.env`
+2. Compare NIC MTU: `ip link show` on sought-perch vs quick-thrush
+3. Check for dropped packets: `netstat -s | grep retransmit` on sought-perch
+4. If MTU mismatch: patch Flannel configmap with explicit `"Backend": {"Type": "vxlan", "MTU": 1450}`
+5. If NIC issue: check `dmesg | grep -i eth` for driver errors
+6. After fix: remove nodeSelector pins from all affected deployments
 
 ## Installed stack
 
