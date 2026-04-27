@@ -1,0 +1,83 @@
+---
+# configure-ntp.yml — Enforce correct NTP server on all cluster nodes
+#
+# Root cause this fixes: MAAS controller IP changed from 192.168.1.87 to
+# 192.168.1.90. Nodes had the old IP hardcoded in cloud-init drop-in config,
+# causing clocks to drift ~137 seconds over time — breaking Ceph mon quorum,
+# taking down OSDs, and making all PVCs unserviceable.
+#
+# Run this after any MAAS IP change, or as a routine check:
+#   ansible-playbook -i inventory/hosts.ini playbooks/configure-ntp.yml
+#
+# Idempotent — safe to run repeatedly.
+
+- name: Configure NTP on all cluster nodes
+  hosts: all
+  become: true
+
+  vars:
+    ntp_server: "{{ maas_ntp_server | default('192.168.1.90') }}"
+    fallback_ntp: "ntp.ubuntu.com"
+    timesyncd_dropin: /etc/systemd/timesyncd.conf.d/cluster.conf
+
+  tasks:
+    - name: Ensure timesyncd drop-in directory exists
+      file:
+        path: /etc/systemd/timesyncd.conf.d
+        state: directory
+        mode: "0755"
+
+    - name: Remove cloud-init NTP drop-in (may have stale IP)
+      file:
+        path: /etc/systemd/timesyncd.conf.d/cloud-init.conf
+        state: absent
+
+    - name: Write cluster NTP config
+      copy:
+        dest: "{{ timesyncd_dropin }}"
+        content: |
+          # Managed by Ansible — do not edit manually
+          # Source: cluster/playbooks/configure-ntp.yml
+          [Time]
+          NTP={{ ntp_server }}
+          FallbackNTP={{ fallback_ntp }}
+        mode: "0644"
+      notify: restart timesyncd
+
+    - name: Ensure systemd-timesyncd is enabled and running
+      systemd:
+        name: systemd-timesyncd
+        enabled: true
+        state: started
+
+    - name: Force immediate clock sync (step, not slew)
+      # systemd-timesyncd slews by default — for large offsets this takes hours.
+      # timedatectl set-ntp true after a restart forces a step on first contact.
+      shell: |
+        timedatectl set-ntp false
+        sleep 1
+        timedatectl set-ntp true
+      changed_when: false
+
+    - name: Wait for clock to synchronize
+      shell: timedatectl status | grep "System clock synchronized: yes"
+      register: sync_check
+      retries: 12
+      delay: 5
+      until: sync_check.rc == 0
+      changed_when: false
+
+    - name: Show current time and sync status
+      shell: timedatectl status | grep -E "Local time|synchronized|NTP service"
+      register: time_status
+      changed_when: false
+
+    - name: Print time status
+      debug:
+        msg: "{{ time_status.stdout_lines }}"
+
+  handlers:
+    - name: restart timesyncd
+      systemd:
+        name: systemd-timesyncd
+        state: restarted

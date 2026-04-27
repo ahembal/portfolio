@@ -16,6 +16,10 @@ pod_cidr: "10.244.0.0/16"  # Flannel default; must match kubeadm --pod-network-c
 maas_dns_server: "192.168.1.90"   # MAAS-managed DNS (bind9 on MAAS)
 upstream_dns: "1.1.1.1"           # fallback if MAAS DNS unavailable
 
+# --- NTP ---
+maas_ntp_server: "192.168.1.90"   # MAAS NTP server (same host as DNS)
+# NOTE: if the MAAS IP changes, update this value and re-run configure-ntp.yml
+
 # --- Ansible connection ---
 ansible_user: ubuntu               # MAAS default image user
 ansible_python_interpreter: /usr/bin/python3
