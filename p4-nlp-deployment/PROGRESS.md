@@ -1,6 +1,18 @@
 # Project 4 — NLP Deployment
 ## Progress Tracker
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-28*
+
+---
+
+## Cluster constraints
+> See `runbooks/known-issues.md` for full details.
+- **Model training:** on HPC (Dardel/UPPMAX) or Kaggle — not on homelab cluster
+- **Serving + Streamlit:** deploy on `quick-thrush` (stable worker, 64 GB RAM)
+- `sought-perch` is cordoned — do not schedule there (ISS-009)
+- Copy `ghcr-pull-secret` to the new namespace before deploying
+- Use full SHA image tags in Helm values (not short SHA) — see ISS-007
+- Postgres/stateful volumes: use `subPath` in volumeMount (ext4 lost+found issue)
+- Serving is CPU inference (~250 MB model) — no GPU needed in K8s, GPU only for training
 
 ---
 

@@ -4,11 +4,14 @@ Ansible playbooks and roles for the homelab Kubernetes cluster.
 
 ## Cluster overview
 
-| Node | Role | IP | OS | Kernel |
+| Node | Role | IP | Status | Notes |
 |------|------|----|----|--------|
-| clever-fly | control-plane (cordoned) | 192.168.1.184 | Ubuntu 24.04.3 | 6.8.0-106 |
-| quick-thrush | worker (stable) | 192.168.1.200 | Ubuntu 24.04.3 | 6.8.0-106 |
-| sought-perch | worker (Flannel issue) | 192.168.1.16 | Ubuntu 24.04.3 | 6.8.0-110 |
+| clever-fly | control-plane | 192.168.1.184 | ✅ Schedulable | Un-cordoned 2026-04-28 — used as overflow worker |
+| quick-thrush | primary worker | 192.168.1.200 | ✅ Schedulable | Stable, all production workloads here |
+| sought-perch | worker (degraded) | 192.168.1.16 | ⛔ Cordoned | kube-proxy crash-loops with exit code 2 — ISS-009 |
+
+> **Effective capacity:** 2 schedulable nodes (quick-thrush + clever-fly), 128 GB RAM total.
+> sought-perch is in the cluster but receives no new workloads until ISS-009 is resolved.
 
 **Note on sought-perch:** Had a Flannel VXLAN bug (kernel 6.8.0-101) causing CNI sandbox
 rebuilds every ~7 minutes — all pods on the node received SIGTERM. Upgraded to 6.8.0-110

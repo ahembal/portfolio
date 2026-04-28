@@ -1,6 +1,15 @@
 # Project 3 — Spark Benchmark
 ## Progress Tracker
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-28*
+
+---
+
+## Cluster constraints
+> See `runbooks/known-issues.md` for full details.
+- **Actual benchmarks run on HPC (UPPMAX/Dardel via SLURM)** — not on the homelab cluster
+- Homelab cluster only used for: results dashboard / notebook server if added
+- If K8s deployment is added: schedule on `quick-thrush`, copy `ghcr-pull-secret` to namespace
+- `sought-perch` is cordoned — do not schedule there (ISS-009)
 
 ---
 

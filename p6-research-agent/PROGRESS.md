@@ -1,6 +1,21 @@
 # Project 6 — Life Science Research Agent
 ## Progress Tracker
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-28*
+
+---
+
+## Cluster constraints
+> See `runbooks/known-issues.md` for full details.
+- **Schedulable nodes:** `quick-thrush` (primary), `clever-fly` (overflow)
+- `sought-perch` is cordoned — do not schedule there (ISS-009)
+- **Ollama resource requirement:** Llama 3.1 8B needs ~16 GB RAM for inference
+  - Set `resources.requests.memory: 18Gi` on Ollama deployment
+  - Schedule explicitly on `quick-thrush` (64 GB RAM)
+  - Use a PVC (`ceph-rbd` StorageClass) for model weights — avoid re-downloading 4+ GB on restart
+  - PVC volumeMount must use `subPath` (ext4 lost+found issue — see ISS-006)
+- **Image pulls:** copy `ghcr-pull-secret` to the new namespace before deploying
+- **Image tags:** use full SHA in Helm values (not short SHA) — see ISS-007
+- **ChromaDB PVC:** also needs `subPath` if using Ceph RBD
 
 ---
 

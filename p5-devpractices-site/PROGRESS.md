@@ -1,6 +1,14 @@
 # Project 5 — Dev Practices Site
 ## Progress Tracker
-*Last updated: 2026-04-21*
+*Last updated: 2026-04-28*
+
+---
+
+## Cluster constraints
+> **p5 does NOT deploy to the homelab cluster.**
+- Deployed via GitHub Pages (`mkdocs gh-deploy`) — no K8s involvement
+- No pull secrets, no namespaces, no Helm charts needed
+- The Dockerfile is optional (for local preview only)
 
 ---
 

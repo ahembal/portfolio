@@ -252,6 +252,43 @@ tags: |
 
 ---
 
+### ISS-009 — kube-proxy exits code 2 on sought-perch after cache sync
+
+| | |
+|---|---|
+| **Status** | Open — sought-perch cordoned 2026-04-28 |
+| **Likelihood** | 5 — Persistent, survives kubeadm reset + rejoin |
+| **Impact** | 3 — One worker node unavailable; cluster still functional on quick-thrush + clever-fly |
+| **Detection** | 2 — CrashLoopBackOff immediately visible |
+| **Recovery** | Unknown — root cause not yet identified |
+| **Risk score** | 15 / 25 🟠 |
+
+**What happened:**
+After node drain + `kubeadm reset --force` + rejoin (done to fix ISS-002), kube-proxy
+started crash-looping again on sought-perch. Same pattern: starts fine, syncs caches,
+exits with code 2 after 60–90 seconds with no error logged. Every kube-proxy restart
+causes `SandboxChanged` events that kill all other pods on the node (Flannel, Redis,
+Postgres etc).
+
+Tried:
+- Full iptables flush (filter + nat + mangle)
+- kubeadm reset + clean CNI + clean flannel interfaces
+- Node drain + delete + rejoin
+
+None fixed it. The crash happens after cache sync with no logged error — the actual
+failure is in a goroutine that calls `os.Exit(2)` before logging.
+
+**Workaround:** sought-perch cordoned. All workloads on quick-thrush + clever-fly.
+
+**Investigation TODO:**
+1. Get the actual stderr at crash time: `kubectl logs -n kube-system <proxy> --previous | grep -v "^I"`
+2. Check for stale IPVS tables: `sudo ipvsadm -L && sudo ipvsadm --clear`
+3. Check conntrack table size: `sudo sysctl net.netfilter.nf_conntrack_count`
+4. Try running kube-proxy manually with verbose logging: `--v=5`
+5. Compare kernel modules between quick-thrush and sought-perch: `lsmod | grep -E "nf_|ip_"`
+
+---
+
 ## Summary
 
 | ID | Issue | Risk | Status |
@@ -264,4 +301,45 @@ tags: |
 | ISS-006 | No default StorageClass / Ceph not fully operational | 🟠 12 | Resolved |
 | ISS-007 | CI pushes full SHA but values.yaml stores short SHA | 🔴 20 | Resolved |
 
-**Open items: ISS-005 (ghcr-pull-secret propagation — needs reflector/kubed)**
+**Open items: ISS-005, ISS-009**
+
+---
+
+## Cluster constraints for project development
+
+> As of 2026-04-28. Read this before starting a new project deployment.
+
+**Schedulable nodes:**
+- `quick-thrush` — primary worker, 16 CPU / 64 GB RAM, all production workloads
+- `clever-fly` — control-plane (un-cordoned), 16 CPU / 64 GB RAM, overflow only
+
+**Do not schedule on:**
+- `sought-perch` — cordoned (ISS-009, kube-proxy broken)
+
+**Storage:**
+- Default StorageClass: `ceph-rbd` (Ceph RBD, pool `k8s-rbd`)
+- Postgres volumes: always use `subPath` in volumeMount (ext4 `lost+found` issue)
+- Ceph has 4 active OSDs across 2 hosts — data is replicated 2-way (not 3-way)
+
+**Image pulls:**
+- GHCR pull secret must be manually copied to each new namespace (ISS-005)
+- Use full SHA tags in Helm values — short SHAs are not pushed to GHCR (ISS-007)
+- Token stored in `pass homelab/github/ghcr-pull-token`
+
+**p6 / Ollama:**
+- Llama 3.1 8B needs ~16 GB RAM — schedule on quick-thrush (64 GB available)
+- Set explicit `resources.requests.memory: 18Gi` on Ollama deployment
+
+**Checklist for new namespace:**
+```bash
+# 1. Copy pull secret
+kubectl get secret ghcr-pull-secret -n pcam -o json \
+  | jq 'del(.metadata.namespace,.metadata.resourceVersion,.metadata.uid,.metadata.creationTimestamp,.metadata.annotations,.metadata.ownerReferences)' \
+  | kubectl apply -f - --namespace <new-ns>
+
+# 2. Apply sealed secrets if needed
+kubectl apply -f k8s/sealed-secret-*.yaml
+
+# 3. Verify Ceph StorageClass exists
+kubectl get storageclass ceph-rbd
+```

@@ -1,6 +1,6 @@
 # Project 2 — Metadata Ingestion Service
 ## Progress Tracker
-*Last updated: 2026-04-24*
+*Last updated: 2026-04-28*
 
 ---
 
@@ -29,8 +29,8 @@
 |---|------|--------|------------|
 | 11 | helm/metadata-ingestion/ chart | ✅ Done | api + worker deployments, service, configmap, HPA (worker), Postgres StatefulSet + PVC, Redis deployment, ArgoCD Application CR. |
 | 12 | k8s/seal-secrets.sh | ✅ Done | Script to generate SealedSecrets for RGW creds + Postgres password. Run once per cluster before deploying. |
-| 13 | Deploy to homelab | ⬜ Todo | Apply sealed secrets → `helm install` or ArgoCD sync → verify pods Running. |
-| 14 | Smoke test | ⬜ Todo | POST /ingest via port-forward → poll /status/{id} until done. |
+| 13 | Deploy to homelab | 🔄 In progress | Sealed secrets applied, Helm chart deployed. Postgres (Ceph RBD PVC) and Redis running. API/Worker blocked on sought-perch kube-proxy issue (ISS-009) — sought-perch now cordoned, redeploying on quick-thrush. |
+| 14 | Smoke test | ⬜ Todo | POST /ingest via port-forward → poll /status/{id} until done. Blocked until step 13 stabilises. |
 
 ### Phase 4 — CI/CD
 | # | Step | Status | What & Why |
