@@ -43,6 +43,8 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgresSecret }}
                   key: password
+            - name: DATABASE_URL
+              value: "postgresql+asyncpg://meta:$(POSTGRES_PASSWORD)@metadata-postgres:5432/metadata"
             - name: RGW_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
