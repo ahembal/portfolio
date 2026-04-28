@@ -4,11 +4,11 @@
 image:
   api:
     repository: ghcr.io/ahembal/metadata-api
-    tag: "e49eb3c02f3b1486dc91ca9fc50dcad430a08176"
+    tag: "ba0a499799166e1208c4950f9508f8661174fa82"
     pullPolicy: IfNotPresent
   worker:
     repository: ghcr.io/ahembal/metadata-worker
-    tag: "e49eb3c02f3b1486dc91ca9fc50dcad430a08176"
+    tag: "ba0a499799166e1208c4950f9508f8661174fa82"
     pullPolicy: IfNotPresent
 
 imagePullSecrets:
