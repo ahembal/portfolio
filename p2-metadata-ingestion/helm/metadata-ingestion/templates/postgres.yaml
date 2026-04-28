@@ -1,7 +1,5 @@
 # In-cluster Postgres StatefulSet + Service + PVC.
-# A StatefulSet (not Deployment) because Postgres needs a stable network
-# identity and stable persistent storage — both guarantees that StatefulSets
-# provide and Deployments do not.
+# Uses Ceph RBD StorageClass for persistent storage.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -12,6 +10,7 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  storageClassName: ceph-rbd
   resources:
     requests:
       storage: {{ .Values.postgres.storage }}
@@ -54,6 +53,7 @@ spec:
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
+              subPath: pgdata
           readinessProbe:
             exec:
               command: ["pg_isready", "-U", "meta", "-d", "metadata"]

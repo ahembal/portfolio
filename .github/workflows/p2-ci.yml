@@ -159,10 +159,10 @@ jobs:
           SHORT_SHA="${GITHUB_SHA:0:7}"
           VALUES=p2-metadata-ingestion/helm/metadata-ingestion/values.yaml
 
-          # Update api tag
-          sed -i "/^  api:/,/^  worker:/{s/tag: .*/tag: \"${SHORT_SHA}\"/}" "${VALUES}"
+          # Update api tag — use full SHA to match what was pushed to GHCR
+          sed -i "/^  api:/,/^  worker:/{s/tag: .*/tag: \"${GITHUB_SHA}\"/}" "${VALUES}"
           # Update worker tag
-          sed -i "/^  worker:/,/^imagePullSecrets/{s/tag: .*/tag: \"${SHORT_SHA}\"/}" "${VALUES}"
+          sed -i "/^  worker:/,/^imagePullSecrets/{s/tag: .*/tag: \"${GITHUB_SHA}\"/}" "${VALUES}"
 
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"

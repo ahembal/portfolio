@@ -59,31 +59,33 @@ No alerting on clock skew. No runbook for MAAS IP changes.
 
 | | |
 |---|---|
-| **Status** | Open — workaround in place |
-| **Likelihood** | 5 — Ongoing, every workload scheduled there is affected |
-| **Impact** | 3 — Pods on sought-perch crash-loop; workloads on other nodes unaffected |
-| **Detection** | 2 — CrashLoopBackOff is visible in kubectl immediately |
-| **Recovery** | 2 — Add nodeSelector to avoid the node; 5 minutes |
-| **Risk score** | 15 / 25 🟠 |
+| **Status** | Resolved — 2026-04-28 |
+| **Likelihood** | 2 — Requires 7+ days of crash-looping to accumulate corrupt state |
+| **Impact** | 4 — All pods on node fail; half the cluster capacity lost |
+| **Detection** | 2 — CrashLoopBackOff immediately visible |
+| **Recovery** | 3 — Node drain + kubeadm reset + rejoin (~30 minutes) |
+| **Risk score** | 8 / 25 🟡 |
 
 **What happened:**
-Pods scheduled on `sought-perch` have their liveness probes fail intermittently,
-causing Kubernetes to restart healthy pods (exit code 0). Affects: sealed-secrets
-controller, ArgoCD pods, Ceph CSI provisioner, Redis.
+Root cause was `kube-proxy` crash-looping (exit code 2) for 7+ days (14,398
+restarts). kube-proxy manages the iptables rules that route traffic to pods.
+Without it, HTTP liveness probes from kubelet to pods fail — Kubernetes then
+restarts healthy pods, creating the appearance of a node networking bug.
 
-**Suspected cause:** Residual Flannel VXLAN networking issue after kernel upgrade
-from 6.8.0-101 (confirmed buggy) to 6.8.0-110. Pod network MTU or NIC driver
-issue causing HTTP health check packets to be dropped.
+kube-proxy was crashing because 14,000+ partial writes had left the iptables
+`KUBE-*` chains in a corrupt/duplicate state it could no longer reconcile.
+This was compounded by the NTP clock skew (ISS-001) which caused the initial
+kube-proxy failures that started the crash loop.
 
-**Workaround:** `nodeSelector: kubernetes.io/hostname: quick-thrush` on all
-critical workloads.
+**Fix:** Drained the node, deleted it from the cluster, ran `kubeadm reset
+--force` to wipe all Kubernetes state (iptables, CNI, certs), flushed the
+remaining iptables KUBE-* chains and Flannel interfaces manually, then
+rejoined with a fresh token. kube-proxy started clean with zero restarts.
 
-**Investigation steps (TODO):**
-1. Check Flannel MTU: `kubectl exec -n kube-flannel <pod-on-sought-perch> -- cat /run/flannel/subnet.env`
-2. Compare NIC MTU: `ip link show` on sought-perch vs quick-thrush
-3. Check dropped packets: `netstat -s | grep retransmit` on sought-perch
-4. If MTU mismatch: patch Flannel ConfigMap with explicit `"MTU": 1450`
-5. After fix: remove all nodeSelector pins
+**Prevention:**
+- Fix clock skew immediately (ISS-001) — prevents initial kube-proxy failures
+- Alert on `kube_pod_container_status_restarts_total > 50` for kube-system pods
+- If kube-proxy starts crash-looping, don't wait — flush iptables or drain+rejoin early
 
 ---
 
@@ -170,7 +172,7 @@ namespaces. Tracked as cluster improvement.
 
 | | |
 |---|---|
-| **Status** | Partially resolved — StorageClass created, PVC provisioning being tested |
+| **Status** | Resolved — 2026-04-28 |
 | **Likelihood** | 3 — Any new stateful workload hits this until Ceph is stable |
 | **Impact** | 4 — Stateful services (Postgres, Prometheus) cannot start |
 | **Detection** | 3 — PVCs stay Pending; requires checking StorageClass and CSI logs |
@@ -182,11 +184,71 @@ Cluster had no default StorageClass. Ceph CSI was installed but the StorageClass
 was never created. Additionally, sought-perch OSD/provisioner issues left Ceph
 in a degraded state that blocked all provisioning.
 
-**Fix in progress:** Ceph cluster being recovered (ISS-001 clock skew fix).
-Once OSDs are back, StorageClass `ceph-rbd` should provision PVCs correctly.
+Root causes identified and fixed:
+1. StorageClass pointed to pool `kubernetes` — actual pool name is `k8s-rbd`
+2. Ceph provisioner had stale in-memory locks from 12+ hours of failed retries
+3. Ceph cluster had 100% inactive PGs due to OSD failures (caused by ISS-001 clock skew)
+
+**Resolution — 2026-04-28:**
+- Fixed StorageClass pool name to `k8s-rbd` → committed to `cluster/manifests/ceph-rbd-storageclass.yaml`
+- Force-deleted stale provisioner pod to clear in-memory locks
+- Fixed NTP (ISS-001) → monitors recovered → OSDs came back → PGs became active
+- PVCs now provision correctly via Ceph RBD
+
+**Note on Postgres volumes:** Ceph RBD formats with ext4 which creates a
+`lost+found` directory. Postgres refuses to init into a non-empty directory.
+Fix: use `subPath: pgdata` in the volumeMount so Postgres gets a clean subdirectory.
 
 **Prevention:**
 - `cluster/manifests/ceph-rbd-storageclass.yaml` committed — apply on fresh cluster setup
+- Fix NTP (ISS-001) immediately to prevent Ceph OSD failures
+
+---
+
+### ISS-007 — CI pushes full SHA tags but values.yaml stores short SHA
+
+| | |
+|---|---|
+| **Status** | Resolved — 2026-04-28 |
+| **Likelihood** | 5 — Affected every deployment since the pipeline was created |
+| **Impact** | 4 — All image pulls fail with NotFound |
+| **Detection** | 4 — GHCR returns "not found" — looks like missing image, not tag mismatch |
+| **Recovery** | 1 — Update values.yaml with full SHA |
+| **Risk score** | 20 / 25 🔴 |
+
+**What happened:**
+CI `build-api` and `build-worker` jobs pushed images tagged with the full
+40-character commit SHA (`${{ github.sha }}`), e.g.:
+
+```
+ghcr.io/ahembal/metadata-api:f523057138174c0fe52b2507ec813644eb8202ce
+ghcr.io/ahembal/metadata-api:latest
+```
+
+The `update-tags` job wrote only the first 7 characters to `values.yaml`:
+
+```yaml
+tag: "f523057"   # ← this tag does not exist in GHCR
+```
+
+GHCR does not resolve short SHAs as aliases for full SHAs. When Kubernetes
+tried to pull `metadata-api:f523057`, GHCR returned 404 Not Found because
+that exact tag was never pushed. Every deployment since CI was created failed
+silently — the `latest` tag worked manually but the pinned SHA tag did not.
+
+**Resolution:**
+- Changed `update-tags` to write `${GITHUB_SHA}` (full 40-char SHA)
+- Updated `values.yaml` manually with the full SHA for the current build
+- Fix is in `.github/workflows/p2-ci.yml`
+
+**TODO — better long-term approach:**
+Also push an explicit short-SHA tag during the build step so both formats work:
+```yaml
+tags: |
+  ${{ env.API_IMAGE }}:${{ github.sha }}
+  ${{ env.API_IMAGE }}:${{ github.sha && substring(0,7) }}
+  ${{ env.API_IMAGE }}:latest
+```
 
 ---
 
@@ -195,10 +257,11 @@ Once OSDs are back, StorageClass `ceph-rbd` should provision PVCs correctly.
 | ID | Issue | Risk | Status |
 |----|-------|------|--------|
 | ISS-001 | NTP server IP stale after MAAS migration | 🔴 20 | Resolved |
-| ISS-002 | sought-perch liveness probe failures | 🟠 15 | Open |
+| ISS-002 | sought-perch liveness probe failures (kube-proxy corrupt iptables) | 🟡 8 | Resolved |
 | ISS-003 | Ceph CSI provisioner stale locks | 🟠 12 | Resolved |
 | ISS-004 | Ceph StorageClass wrong pool name | 🟡 8 | Resolved |
-| ISS-005 | ghcr-pull-secret not propagated | 🟠 15 | Open |
-| ISS-006 | No default StorageClass | 🟠 12 | Partial |
+| ISS-005 | ghcr-pull-secret not propagated to new namespaces | 🟠 15 | Open |
+| ISS-006 | No default StorageClass / Ceph not fully operational | 🟠 12 | Resolved |
+| ISS-007 | CI pushes full SHA but values.yaml stores short SHA | 🔴 20 | Resolved |
 
-**Open high-risk items: ISS-002, ISS-005**
+**Open items: ISS-005 (ghcr-pull-secret propagation — needs reflector/kubed)**
