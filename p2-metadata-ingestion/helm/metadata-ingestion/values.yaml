@@ -91,7 +91,7 @@ redis:
 # Application config (non-sensitive — goes in ConfigMap)
 # ---------------------------------------------------------------------------
 config:
-  rgwEndpoint: "http://192.168.1.16"
+  rgwEndpoint: "http://192.168.1.200"
   storageBucket: "metadata-files"
   redisUrl: "redis://metadata-redis:6379/0"
 

@@ -29,8 +29,8 @@
 |---|------|--------|------------|
 | 11 | helm/metadata-ingestion/ chart | ✅ Done | api + worker deployments, service, configmap, HPA (worker), Postgres StatefulSet + PVC, Redis deployment, ArgoCD Application CR. |
 | 12 | k8s/seal-secrets.sh | ✅ Done | Script to generate SealedSecrets for RGW creds + Postgres password. Run once per cluster before deploying. |
-| 13 | Deploy to homelab | 🔄 In progress | Sealed secrets applied, Helm chart deployed. Postgres (Ceph RBD PVC) and Redis running. API/Worker blocked on sought-perch kube-proxy issue (ISS-009) — sought-perch now cordoned, redeploying on quick-thrush. |
-| 14 | Smoke test | ⬜ Todo | POST /ingest via port-forward → poll /status/{id} until done. Blocked until step 13 stabilises. |
+| 13 | Deploy to homelab | ✅ Done | Sealed secrets applied. Helm chart deployed on clever-fly (quick-thrush primary, sought-perch cordoned ISS-009). All 4 pods running: API, Worker, Postgres (Ceph RBD PVC), Redis. Fixed: DATABASE_URL env substitution, RGW endpoint (192.168.1.200), full SHA image tags. |
+| 14 | Smoke test | ✅ Done | POST /ingest → status=done, sha256 written, s3_key `uploads/2026/04/28/…/README.md`. Full pipeline verified end-to-end. |
 
 ### Phase 4 — CI/CD
 | # | Step | Status | What & Why |
@@ -55,7 +55,7 @@
 ```
 Phase 1  [██████] 6/6  ✅ Done
 Phase 2  [████]   4/4  ✅ Done
-Phase 3  [██░░]   2/4  ← deploy + smoke test pending
+Phase 3  [████]   4/4  ✅ Done
 Phase 4  [██]     2/2  ✅ Done
 Phase 5  [██████] 6/6  ✅ Done
 ```
