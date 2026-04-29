@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=naiss2026-4-384
+#SBATCH --account=UPPMAX-2026-1-11
 #SBATCH --partition=node
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
@@ -13,14 +13,15 @@
 #SBATCH --mail-user=emre.balsever@liu.se
 
 # =============================================================================
-# SRA Spark benchmark — UPPMAX (Rackham)
-# Allocation: NAISS 2026/4-384
+# SRA Spark benchmark — UPPMAX (Pelle)
+# Allocation: UPPMAX 2026/1-11 (NBIS support)
+# Login: pelle.uppmax.uu.se
 #
-# Runs the same pipeline at 10M and 40M rows with 1, 2, and 4 nodes.
+# Runs pipeline at 10M and 40M rows with 1, 2, and 4 nodes.
 # Results written to /proj/nbis_support/portfolio/p3/results/
 #
 # Submit:  sbatch jobs/uppmax_spark.sh
-# Monitor: squeue -u emre.balsever
+# Monitor: squeue -u $USER
 # =============================================================================
 
 set -euo pipefail

@@ -13,14 +13,14 @@ available infrastructure.
 
 ## Infrastructure
 
-### UPPMAX — Rackham
-CPU cluster operated by Uppsala University for NAISS. Used for Spark runs.
+### UPPMAX — Pelle
+CPU cluster operated by Uppsala University. Used for Spark runs.
 
 - Nodes: 128 cores, 256 GB RAM per node
-- Storage: Crex (Lustre, shared across nodes)
+- Storage: Crex (Lustre, shared with Dardel via `/proj/nbis_support/`)
 - Scheduler: SLURM
 - Modules used: `java/17`, `spark/3.5.0`
-- Allocation: `naiss2026-4-384`
+- Allocation: `UPPMAX 2026/1-11` (NBIS support)
 
 ### PDC Dardel
 GPU/CPU cluster at KTH. Used for cuDF GPU runs.
