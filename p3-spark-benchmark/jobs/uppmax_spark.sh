@@ -10,7 +10,7 @@
 #SBATCH --output=%j_spark.out
 #SBATCH --error=%j_spark.err
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=emre.balsever@liu.se
+#SBATCH --mail-user=emre.balsever@scilifelab.se
 
 # =============================================================================
 # SRA Spark benchmark — UPPMAX (Pelle)
@@ -31,7 +31,8 @@ echo "Job $SLURM_JOB_ID started on $SLURM_NODELIST at $(date)"
 module load java/17
 module load spark/3.5.0
 
-PROJECT=/proj/nbis_support/portfolio
+# Set PROJECT to your allocation storage directory (see docs/hpc-accounts.md.local)
+: "${PROJECT:?Set PROJECT to your allocation storage directory}"
 CODE=$PROJECT/code/p3-spark-benchmark
 DATA=$PROJECT/p3/data
 RESULTS=$PROJECT/p3/results

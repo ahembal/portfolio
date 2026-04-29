@@ -7,7 +7,7 @@
 #SBATCH --output=%j_gpu.out
 #SBATCH --error=%j_gpu.err
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=emre.balsever@liu.se
+#SBATCH --mail-user=emre.balsever@scilifelab.se
 
 # =============================================================================
 # SRA GPU benchmark — Dardel (AMD MI250X, ROCm)
@@ -26,7 +26,8 @@ echo "Job $SLURM_JOB_ID started on $SLURM_NODELIST at $(date)"
 
 module load RAPIDS/24.06-rocm-6.0-python-3.11
 
-PROJECT=/proj/nbis_support/portfolio
+# Set PROJECT to your allocation storage directory (see docs/hpc-accounts.md.local)
+: "${PROJECT:?Set PROJECT to your allocation storage directory}"
 CODE=$PROJECT/code/p3-spark-benchmark
 DATA=$PROJECT/p3/data
 RESULTS=$PROJECT/p3/results

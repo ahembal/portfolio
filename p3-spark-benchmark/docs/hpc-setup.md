@@ -1,100 +1,128 @@
 # HPC Setup and Job Submission
 
-## Code deployment
+Cluster-specific details (usernames, paths, account IDs, storage usage)
+are in `docs/hpc-accounts.md.local` — gitignored, never committed.
 
-Both UPPMAX and Dardel have access to `/proj/nbis_support/` (Crex storage).
-The simplest approach is to clone the portfolio repo directly on the cluster.
+---
 
-### First time setup (run once per cluster)
+## Clusters overview
 
-Allocation details are in `docs/hpc-accounts.md.local` (gitignored).
+| Cluster | System | Use case | Access | Storage |
+|---------|--------|----------|--------|---------|
+| Dardel | PDC/KTH | GPU + CPU benchmarks | SSH key via PDC portal | Klemming |
+| Pelle | UPPMAX/Uppsala | CPU/Spark benchmarks | SUNET required + TOTP | Crex |
 
+---
+
+## Dardel (PDC, KTH)
+
+**Current status:** Active — used for GPU and CPU benchmarks.
+
+### SSH access
 ```bash
-# On UPPMAX (Pelle)
-ssh <user>@pelle.uppmax.uu.se
-cd /proj/nbis_support/portfolio
-git clone git@github.com:ahembal/portfolio.git code
-cd code/p3-spark-benchmark
+ssh -i ~/.ssh/id_ed25519 <username>@dardel.pdc.kth.se
+```
+
+Key must be registered at: `https://loginportal.pdc.kth.se`
+- Log in with your SUPR/university account
+- Add SSH public key under "Nyckelhantering" (Key management)
+- Key is active immediately
+
+No VPN or university network required — accessible from anywhere.
+
+### Partitions
+```bash
+sinfo                     # list all partitions
+sinfo -p gpu              # GPU nodes (AMD MI250X)
+sinfo -p main             # CPU nodes (128 cores, 256 GB RAM)
+```
+
+### Storage
+Klemming filesystem — path in `hpc-accounts.md.local`.
+Check usage: `lfs quota -h -u $USER /cfs/klemming`
+
+---
+
+## UPPMAX Pelle
+
+**Current status:** Not yet set up — requires SUNET access.
+
+### SSH access
+```bash
+ssh <username>@pelle.uppmax.uu.se
+```
+
+**Requirements:**
+1. **SUNET** — must be on Swedish university network (eduroam, VPN, or on-campus)
+   - VPN: `https://www.uppmax.uu.se/support/user-guides/vpn-for-uppmax/`
+   - Or use eduroam at any Swedish university
+2. **TOTP** — two-factor authentication required
+   - Set up via SUPR: `https://supr.naiss.se` → your profile → Two-factor auth
+3. **SSH key** — register at SUPR under your account → SSH keys
+
+### Storage
+Crex filesystem at `/proj/nbis_support` — 1 TB, ~611 GB free.
+Path in `hpc-accounts.md.local`.
+
+### When to use Pelle
+- Spark benchmark at large scale (40M+ rows) — more storage headroom than Dardel
+- CPU-heavy jobs where Dardel CPU queue is long
+- Once SUNET VPN + TOTP is set up, identical workflow to Dardel
+
+---
+
+## General workflow (both clusters)
+
+### First time setup
+```bash
+# SSH to cluster, go to your project storage directory
+cd <your-project-dir>
+mkdir -p portfolio/code && cd portfolio/code
+git clone git@github.com:ahembal/portfolio.git .
+cd p3-spark-benchmark
 pip install --user pandas pyarrow requests
-
-# On Dardel
-ssh <user>@dardel.pdc.kth.se
-cd /proj/nbis_support/portfolio
-git clone git@github.com:ahembal/portfolio.git code
 ```
 
-### Updating code before a run
-
+### Before each run
 ```bash
-cd /proj/nbis_support/portfolio/code
-git pull
+git pull   # sync latest code
 ```
 
-## Data staging
-
-Fetch data once per cluster — it lives in shared Crex storage, visible from
-all compute nodes.
+### Data staging
+Fetch once — data stays on cluster, reused across runs.
+Delete `data/` after runs to free storage (re-fetchable from NCBI in ~30 min).
 
 ```bash
-# On UPPMAX (fetch 10M + 40M — ~2 GB + ~7 GB, takes ~30-40 min each)
-python /proj/nbis_support/portfolio/code/p3-spark-benchmark/src/fetch_data.py \
-    --sample 10M --out /proj/nbis_support/portfolio/p3/data/
-
-python /proj/nbis_support/portfolio/code/p3-spark-benchmark/src/fetch_data.py \
-    --sample 40M --out /proj/nbis_support/portfolio/p3/data/
+python src/fetch_data.py --sample 10M --out <your-project-dir>/p3/data/
+python src/fetch_data.py --sample 40M --out <your-project-dir>/p3/data/
 ```
 
-On Dardel the same `/proj/nbis_support/` path is accessible — no need to
-fetch again if already staged on UPPMAX.
-
-## Submitting jobs
-
-### UPPMAX — Spark benchmark
+### Submitting jobs
 ```bash
-ssh <user>@rackham.uppmax.uu.se
-cd /proj/nbis_support/portfolio/code/p3-spark-benchmark
-sbatch jobs/uppmax_spark.sh
-
-# Monitor
-squeue -u $USER
-jobinfo <job_id>
-
-# Output logs
-tail -f <job_id>_spark.out
-```
-
-### Dardel — GPU benchmark
-```bash
-ssh <user>@dardel.pdc.kth.se
-cd /proj/nbis_support/portfolio/code/p3-spark-benchmark
+# GPU benchmark (Dardel)
+export PROJECT=<your-project-dir>
 sbatch jobs/dardel_gpu.sh
 
-# Monitor
-squeue -u $USER
-tail -f <job_id>_gpu.out
+# Spark benchmark (Dardel CPU or Pelle)
+export PROJECT=<your-project-dir>
+sbatch jobs/uppmax_spark.sh      # also works on Dardel with -p main
+
+squeue -u $USER                  # monitor
+tail -f <job_id>_spark.out       # live log
 ```
 
-## Retrieving results
-
-After jobs complete, results are in `/proj/nbis_support/portfolio/p3/results/`.
-Copy them back to the local repo:
-
+### Retrieving results
 ```bash
-# From your laptop
-scp <user>@rackham.uppmax.uu.se:/proj/nbis_support/portfolio/p3/results/*.json \
-    /home/emrebalsever/repos/portfolio/p3-spark-benchmark/results/
+# Copy timing JSONs to local repo
+scp <user>@dardel.pdc.kth.se:<your-project-dir>/p3/results/*.json \
+    results/
 
-scp <user>@dardel.pdc.kth.se:/proj/nbis_support/portfolio/p3/results/*.json \
-    /home/emrebalsever/repos/portfolio/p3-spark-benchmark/results/
-```
-
-Then consolidate and commit:
-```bash
-cd /home/emrebalsever/repos/portfolio/p3-spark-benchmark
+# Consolidate
 python -c "
 import json, glob, pandas as pd
 rows = [json.loads(open(f).read()) for f in glob.glob('results/*.json')]
 pd.DataFrame(rows).to_csv('results/benchmark_table.csv', index=False)
+print(pd.DataFrame(rows)[['approach','scale','nodes','total_s','throughput_M_rows_per_s']])
 "
 git add results/ && git commit -m 'feat(p3): add HPC benchmark results'
 git push
