@@ -18,39 +18,39 @@
 ### Phase 1 — Data generation + Pandas baseline
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | src/generate_data.py | ⬜ Todo | Generates synthetic Parquet at 1M / 10M / 100M rows. Without reproducible data at multiple scales the benchmark can't be run or compared across systems. Columns: timestamp, category, sensor_id, value, unit — representative of a sensor log or genomics metadata table. |
-| 2 | src/pipeline_pandas.py | ⬜ Todo | Pandas implementation of the full pipeline (filter → broadcast join → aggregate → window). Single-node, in-memory, no cluster overhead — the baseline all other results are measured against. All other pipelines must produce identical output to this one (correctness gate). |
-| 3 | Local baseline runs | ⬜ Todo | Run pipeline_pandas at 1M and 10M rows, record wall time and peak memory. 10M is where pandas starts to slow; 100M likely OOMs — which is exactly the motivation for Spark and GPU. |
+| 1 | src/fetch_data.py | ✅ Done | Streams real NCBI SRA metadata (not synthetic). ~40M RUN records, updated daily. No auth needed. Fetches 1M rows in ~3 min locally; larger scales staged on HPC. See docs/data-source.md for schema, fetch timing, and data quality notes. |
+| 2 | src/pipeline_pandas.py | ✅ Done | Pandas baseline: filter (live + Bases>0) → broadcast join with platform_lookup → aggregate (Center/technology/year) → cumulative window. Writes Parquet + timing JSON. |
+| 3 | Local baseline runs | ✅ Done | 1M rows: 1.1s, 0.94 M rows/s. Load=0.55s dominates. Compute (filter+join+agg+window)=0.51s. Results in results/pandas_sra_runs_1M.json. |
 
 ### Phase 2 — Spark pipeline on UPPMAX
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 4 | src/pipeline_spark.py | ⬜ Todo | PySpark implementation of the same pipeline. Uses the DataFrame API and broadcast join hint for the small lookup table (avoids shuffle). Must produce identical aggregated output to pandas — confirmed before claiming any speedup. |
-| 5 | jobs/uppmax_spark.sh | ⬜ Todo | SLURM submit script for UPPMAX. Module loading (Java, Spark), executor/memory flags, spark-submit invocation. Getting code to run on a cluster is a separate skill from writing the code — this is the HPC operations layer. |
-| 6 | Results at 10M + 100M rows | ⬜ Todo | Run on UPPMAX, collect timing JSON per scale. These are the data points for benchmark_table.csv. 100M rows is where Spark's distribution overhead becomes worth paying vs. pandas. |
-| 7 | Scaling experiment 1→4 nodes | ⬜ Todo | Run 100M rows at 1, 2, 4 executor nodes. Shows whether Spark scales linearly or where the bottleneck is (shuffle cost, driver overhead). The deviation from linear is the interesting story for Q8. |
+| 4 | src/pipeline_spark.py | ✅ Done | PySpark version. Broadcast join hint, shuffle partitions tuned per node count. Identical logic to pandas — correctness verified by output diff. |
+| 5 | jobs/uppmax_spark.sh | ✅ Done | SLURM script for Rackham. Account naiss2026-4-384, 4 nodes, runs 10M + 40M at 1/2/4 nodes. |
+| 6 | Results at 10M + 40M rows | ⬜ Todo | Submit to UPPMAX, collect timing JSONs. |
+| 7 | Scaling experiment 1→4 nodes | ⬜ Todo | Already built into uppmax_spark.sh — runs automatically at each node count. |
 
 ### Phase 3 — GPU pipeline on Dardel
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 8 | src/pipeline_gpu.py | ⬜ Todo | cuDF implementation. API mirrors pandas so the diff is mostly `import cudf as pd`. GPU DataFrames are fast because columnar operations are vectorised on thousands of CUDA cores with HBM memory bandwidth — no Python GIL, no row iteration. |
-| 9 | jobs/dardel_gpu.sh | ⬜ Todo | SLURM script for Dardel GPU partition (A100, 80 GB VRAM). `module load RAPIDS`, `--gres=gpu:a100:1`. 100M rows of this schema fits in 80 GB with room to spare — no chunking needed, which is cuDF's sweet spot. |
-| 10 | Results at 10M + 100M rows | ⬜ Todo | Timing from Dardel. Single GPU vs single-node pandas at 100M rows is the headline comparison. Typically 5–20× faster on columnar filter/agg — the number goes into the Q8 narrative. |
+| 8 | src/pipeline_gpu.py | ✅ Done | cuDF version with ROCm backend (Dardel uses AMD MI250X, not NVIDIA). Falls back to pandas if cuDF unavailable (for local testing). |
+| 9 | jobs/dardel_gpu.sh | ✅ Done | SLURM script for Dardel GPU. Account naiss2026-4-384, MI250X, module load RAPIDS/24.06-rocm-6.0. Runs 10M + 40M rows. |
+| 10 | Results at 10M + 40M rows | ⬜ Todo | Submit to Dardel, collect timing JSONs. |
 
 ### Phase 4 — Analysis + Docs
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 11 | results/benchmark_table.csv | ⬜ Todo | Consolidates all timing results: approach × scale × node_count → wall_time_s, throughput_rows_per_s, peak_memory_gb. The evidence base for all plots and the Q8 narrative — without it the comparison is anecdotal. |
-| 12 | notebooks/benchmark_pipeline.ipynb | ⬜ Todo | Speedup curves (pandas = 1×), Spark scaling efficiency, cost-per-row chart. Visualising the crossover point makes the tradeoff concrete — "Spark is only worth it above X rows" is a much stronger claim with a chart. |
-| 13 | docs/q8-hpc-narrative.md | ⬜ Todo | Written reflection: what UPPMAX/Dardel are, how SLURM works, why Spark shuffles are expensive, why cuDF is fast, where each wins. Grounded in the actual numbers from the benchmark runs — not theory. |
+| 11 | results/benchmark_table.csv | ⬜ Todo | Consolidate all timing JSONs after HPC runs complete. |
+| 12 | notebooks/benchmark_pipeline.ipynb | ⬜ Todo | Speedup plots and crossover analysis. Written after results are in. |
+| 13 | docs/q8-hpc-narrative.md | ⬜ Todo | Skeleton exists. Fill in with real numbers after HPC runs. |
 
 ---
 
 ## Quick status
 
 ```
-Phase 1  [░░░]  0/3  ← start here
-Phase 2  [░░░░] 0/4
-Phase 3  [░░░]  0/3
-Phase 4  [░░░]  0/3
+Phase 1  [███]  3/3  ✅ Done
+Phase 2  [██░░] 2/4  ← submit to UPPMAX
+Phase 3  [██░]  2/3  ← submit to Dardel
+Phase 4  [░░░]  0/3  ← after HPC results
 ```

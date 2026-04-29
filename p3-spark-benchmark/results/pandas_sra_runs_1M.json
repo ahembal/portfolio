@@ -1,0 +1,13 @@
+{
+  "approach": "pandas",
+  "scale": "sra_runs_1M",
+  "n_input": 1000000,
+  "n_output": 14,
+  "total_s": 1.067,
+  "throughput_M_rows_per_s": 0.937,
+  "load_s": 0.553,
+  "filter_s": 0.23,
+  "join_s": 0.16,
+  "agg_s": 0.122,
+  "window_s": 0.002
+}
