@@ -21,9 +21,9 @@
 ### Phase 1 — Training
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | notebooks/train_pubmed_rct.ipynb | ⬜ Todo | Kaggle notebook: load PubMed RCT from HuggingFace Hub, fine-tune DistilBERT with Trainer API, save best checkpoint. This is where the model comes from — everything downstream depends on having trained weights. |
-| 2 | Evaluate + record metrics | ⬜ Todo | Accuracy, macro F1, per-class F1 on test set. These numbers go into the Q4/Q5 docs as evidence of real performance. Target ≥ 85% accuracy (DistilBERT without domain tuning baseline). |
-| 3 | Push model to Ceph RGW | ⬜ Todo | Upload model weights + tokenizer to `s3://nlp-models/pubmed-rct/kaggle-001/`. Same RGW pattern as p1 — serving pulls from here at startup, so the image stays small and model versioning is decoupled from code. |
+| 1 | notebooks/train_pubmed_rct.ipynb | ✅ Done | Kaggle notebook written: load PubMed RCT 200k, fine-tune DistilBERT (3 epochs, T4 GPU, ~45 min), evaluate on test set (target ≥ 85%), push model + metrics.json to s3://nlp-models/pubmed-rct/v1/ via RGW. Add Kaggle Secrets: RGW_ENDPOINT / RGW_ACCESS_KEY / RGW_SECRET_KEY before running. |
+| 2 | Evaluate + record metrics | 🔄 In progress | Built into notebook — runs on test set after training, asserts ≥ 85% accuracy. |
+| 3 | Push model to Ceph RGW | 🔄 In progress | Built into notebook — auto-uploads to s3://nlp-models/pubmed-rct/v1/ after training. |
 
 ### Phase 2 — Serving
 | # | Step | Status | What & Why |
