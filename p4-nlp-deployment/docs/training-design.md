@@ -1,4 +1,5 @@
 # Training Design — PubMed RCT Sentence Classification
+*Last updated: 2026-05-02*
 
 ## What we are building and why
 
@@ -21,12 +22,31 @@ this task is representative of that work.
 **Source:** Dernoncourt & Lee (2017), *PubMed 200k RCT: a Dataset for Sequential
 Sentence Classification in Medical Abstracts*
 
-**Why this dataset:**
-- Real biomedical text — not a synthetic benchmark
-- 200k sentences from 20k PubMed abstracts, manually labelled
-- Standard benchmark with published baselines for comparison
-- Publicly available on HuggingFace Hub (`joolsa/pubmed_rct_200k`)
-- Small enough to fine-tune in < 1 hour on a T4 GPU
+**HuggingFace identifier (current):** `armanc/pubmed-rct20k`
+
+### Dataset history and rationale
+
+**First attempt (2026-04-30):** `pietrolesci/pubmed-200k-rct`
+- Contains 2.27M sentences (200k abstracts × ~11 sentences each)
+- Labels pre-encoded as integers 0–4
+- **Problem:** At batch_size=64 on Kaggle T4 (1.55 it/s), one epoch takes ~6 hours.
+  Kaggle sessions time out before training completes — not practical.
+
+**Revised choice (2026-05-02):** `armanc/pubmed-rct20k`
+- Contains ~177k sentences (20k abstracts), same 5-class label structure
+- Labels are lowercase strings: `background, objective, methods, results, conclusions`
+- 3 epochs complete in ~90 minutes on T4 — fits within Kaggle session limit
+- Same Dernoncourt & Lee (2017) source; 20k split is standard in published experiments
+
+**Why the smaller dataset is still valid:**
+177k training sentences gives thousands of examples per class. The accuracy gap
+vs. training on the full 2.27M is typically < 2% for BERT-class models on this task.
+The goal is a working deployment demo, not a SOTA benchmark — the 20k version is
+the appropriate choice for this context.
+
+**Label encoding:**
+Labels are lowercase strings mapped to integers 0–4 via `LABEL2ID` in the tokenise
+function. `ID2LABEL` stores uppercase names for human-readable output.
 
 **Class distribution (approximate):**
 
@@ -87,6 +107,26 @@ see a full pass before meaningful metrics emerge, and frequent eval adds overhea
 The model checkpoint with highest validation accuracy is saved, not the final
 epoch. This is important because loss can increase in epoch 3 while accuracy
 plateaus — we want the best generalising model, not the most-trained one.
+
+---
+
+## Dependency and API notes (Kaggle-specific)
+
+**Do not reinstall boto3 on Kaggle:**
+Kaggle pre-installs `boto3` with a version compatible with its `aiobotocore`.
+Pinning `boto3==1.34.0` downgrades `botocore` to 1.34.x, which breaks
+`aiobotocore 3.3.0` (requires botocore >=1.42.62). The upload cell uses
+Kaggle's pre-installed boto3 — no explicit install needed.
+
+**transformers `Trainer` API change (>=4.47):**
+The `tokenizer=` parameter was renamed to `processing_class=` in transformers
+v4.47. The notebook uses `processing_class=tokenizer` to work with current
+versions installed via `pip install 'transformers>=4.41.0'`.
+
+**scikit-learn required by `evaluate`:**
+The `evaluate` library uses `scikit-learn` internally for accuracy and F1
+computation. Kaggle has it pre-installed; local environments may need
+`pip install scikit-learn`.
 
 ---
 

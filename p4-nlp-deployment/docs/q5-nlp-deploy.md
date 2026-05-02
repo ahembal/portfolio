@@ -1,4 +1,5 @@
 # Q5 — NLP Deployment
+*Last updated: 2026-05-01*
 
 > This document covers what is different about deploying an NLP model compared
 > to image classification (p1), and the specific engineering decisions made.

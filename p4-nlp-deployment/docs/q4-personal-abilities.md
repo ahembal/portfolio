@@ -1,4 +1,5 @@
 # Q4 — Personal Abilities
+*Last updated: 2026-05-01*
 
 > Numbers in `[brackets]` are filled after training completes.
 
