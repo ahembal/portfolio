@@ -56,10 +56,17 @@ Expires:     never
 pass ls
 └── homelab/
     ├── rgw/
-    │   ├── access-key      Ceph RGW S3 access key (shared across projects)
-    │   └── secret-key      Ceph RGW S3 secret key
-    └── p2/
-        └── postgres-password   PostgreSQL password for metadata-ingestion
+    │   ├── access-key          Ceph RGW S3 access key (shared across projects)
+    │   └── secret-key          Ceph RGW S3 secret key
+    ├── p2/
+    │   └── postgres-password   PostgreSQL password for metadata-ingestion
+    ├── github/
+    │   └── ghcr-pull-token     GitHub PAT for pulling private GHCR images
+    └── huggingface/
+        └── kaggle-token        HuggingFace fine-grained token (write:repos)
+                                Used to push/pull models between Kaggle and HuggingFace Hub
+                                Created 2026-05-02, name: KAGGLE
+                                NOTE: token was shared in chat — rotate at huggingface.co/settings/tokens
 ```
 
 ### How to seal secrets for a project

@@ -65,15 +65,17 @@ in published work; this notebook avoids it.
 
 | Metric | Value |
 |--------|-------|
-| Test accuracy | [X]% |
-| Macro F1 | [X] |
-| F1 — BACKGROUND | [X] |
-| F1 — OBJECTIVE | [X] |
-| F1 — METHODS | [X] |
-| F1 — RESULTS | [X] |
-| F1 — CONCLUSIONS | [X] |
+| Test accuracy | **86.8%** |
+| Macro F1 | 0.806 |
+| F1 — BACKGROUND | 0.706 |
+| F1 — OBJECTIVE | 0.640 |
+| F1 — METHODS | 0.937 |
+| F1 — RESULTS | 0.915 |
+| F1 — CONCLUSIONS | 0.833 |
 
-*Context: BioBERT ~92%, general DistilBERT ~86-88% on this task.*
+*Context: BioBERT ~92%, general DistilBERT ~86-88% on this task. Our result (86.8%) is within the expected range.*
+
+*Trained on `armanc/pubmed-rct20k` (~177k sentences, 3 epochs on Kaggle T4 GPU). Model stored at `s3://nlp-models/pubmed-rct/v1/` on Ceph RGW.*
 
 ---
 
