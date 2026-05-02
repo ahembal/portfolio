@@ -48,3 +48,37 @@ Phase 1  [░░░░░] 0/5  ← start here
 Phase 2  [░░░░░] 0/5
 Phase 3  [░░░]   0/3
 ```
+
+---
+
+## Design change — 2026-05-02
+
+**Previous approach:** MkDocs + Material theme + GitHub Pages (static docs site).
+
+**Revised approach:** Lovable (React) + Vercel hosting.
+
+**Why changed:**
+MkDocs produces documentation-style output (ReadTheDocs look). A modern interactive
+React site makes a stronger first impression. Lovable allows building a polished,
+branded single-page site without context-switching from the rest of the portfolio work.
+
+**What stays the same:** All content (testing, CI/CD, security, observability, code
+quality, synthesis) is unchanged. Evidence links point to the same repo files.
+The site is still strictly dev practices — no personal bio.
+
+**New steps added below:**
+
+### Phase 4 — Lovable build (new, replaces Phase 1-3 delivery)
+| # | Step | Status | What & Why |
+|---|------|--------|------------|
+| 14 | content.md | ✅ Done | All site content written: 6 sections with evidence links, Q10 synthesis. Source of truth for what goes into Lovable. |
+| 15 | lovable-prompt.md | ✅ Done | Full Lovable prompt: design spec (dark/amber, minimal), complete site structure, all copy, technical requirements (React + Tailwind, dark/light toggle, mobile responsive). |
+| 16 | docs/q10-dev-practices.md | ⬜ Todo | Standalone Q10 answer doc — synthesises all sections into a narrative. |
+| 17 | README.md | ⬜ Todo | Project readme explaining what the site is and how it was built. |
+| 18 | Build in Lovable | ⬜ Todo | Paste lovable-prompt.md into Lovable, iterate until design matches spec. |
+| 19 | Deploy to Vercel | ⬜ Todo | Connect Lovable output to Vercel for hosting. |
+| 20 | Link from CV site | ⬜ Todo | Add link to the deployed site from the existing CV webpage. |
+
+```
+Phase 4  [██░░░░░] 2/7  ← in progress
+```
