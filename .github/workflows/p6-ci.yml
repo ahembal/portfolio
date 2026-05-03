@@ -25,6 +25,9 @@ jobs:
   build-api:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: write
     outputs:
       sha: ${{ steps.meta.outputs.sha }}
     steps:
@@ -47,6 +50,9 @@ jobs:
   build-streamlit:
     needs: test
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Log in to GHCR
@@ -65,6 +71,8 @@ jobs:
   update-tags:
     needs: [build-api, build-streamlit]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
         with:
