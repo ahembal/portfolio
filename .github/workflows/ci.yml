@@ -49,13 +49,11 @@ jobs:
           cache-dependency-path: p1-pcam-deployment/serving/requirements.txt
 
       - name: Install dependencies
-        # Only install what tests and linting need — not the full ML stack.
-        # torch/torchvision are mocked in tests so we don't need GPU here.
         run: |
           pip install -q \
             fastapi httpx pytest pytest-cov \
-            pillow numpy \
-            ruff
+            pillow numpy ruff \
+            torch torchvision --index-url https://download.pytorch.org/whl/cpu
         working-directory: p1-pcam-deployment
 
       - name: Lint — ruff
