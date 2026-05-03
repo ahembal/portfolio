@@ -1,0 +1,25 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-agent-streamlit
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.streamlit.replicas }}
+  selector:
+    matchLabels:
+      app: research-agent-streamlit
+  template:
+    metadata:
+      labels:
+        app: research-agent-streamlit
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: streamlit
+          image: "{{ .Values.streamlit.image.repository }}:{{ .Values.streamlit.image.tag }}"
+          ports:
+            - containerPort: 8501
+          envFrom:
+            - configMapRef:
+                name: research-agent-config

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: research-agent-api
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: {{ .Values.api.replicas }}
+  selector:
+    matchLabels:
+      app: research-agent-api
+  template:
+    metadata:
+      labels:
+        app: research-agent-api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: api
+          image: "{{ .Values.api.image.repository }}:{{ .Values.api.image.tag }}"
+          ports:
+            - containerPort: 8000
+          envFrom:
+            - configMapRef:
+                name: research-agent-config
+          resources:
+            requests:
+              cpu: {{ .Values.api.resources.requests.cpu | quote }}
+              memory: {{ .Values.api.resources.requests.memory | quote }}
+            limits:
+              cpu: {{ .Values.api.resources.limits.cpu | quote }}
+              memory: {{ .Values.api.resources.limits.memory | quote }}
+          volumeMounts:
+            - name: chromadb-data
+              mountPath: /data/chromadb
+              subPath: chromadb
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 30
+            periodSeconds: 15
+      volumes:
+        - name: chromadb-data
+          persistentVolumeClaim:
+            claimName: chromadb-pvc

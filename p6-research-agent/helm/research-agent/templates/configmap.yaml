@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: research-agent-config
+  namespace: {{ .Values.namespace }}
+data:
+  OLLAMA_BASE_URL: "http://ollama:11434"
+  OLLAMA_MODEL: {{ .Values.ollama.model | quote }}
+  CHROMADB_PATH: "/data/chromadb"
+  NCBI_EMAIL: {{ .Values.ncbiEmail | quote }}
+  API_URL: "http://research-agent-api:8000"

@@ -1,0 +1,87 @@
+name: p6-research-agent CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "p6-research-agent/**"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: p6-research-agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+      - run: pip install -r requirements.txt
+      - run: pip install pytest ruff
+      - run: ruff check src/ tests/
+      - run: pytest tests/ -v
+
+  build-api:
+    needs: test
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.meta.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push API
+        id: meta
+        run: |
+          docker build -f p6-research-agent/Dockerfile \
+            -t ghcr.io/ahembal/research-agent-api:${{ github.sha }} \
+            p6-research-agent/
+          docker push ghcr.io/ahembal/research-agent-api:${{ github.sha }}
+          echo "sha=${{ github.sha }}" >> $GITHUB_OUTPUT
+
+  build-streamlit:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Build and push Streamlit
+        run: |
+          docker build -f p6-research-agent/Dockerfile.streamlit \
+            -t ghcr.io/ahembal/research-agent-streamlit:${{ github.sha }} \
+            p6-research-agent/
+          docker push ghcr.io/ahembal/research-agent-streamlit:${{ github.sha }}
+
+  update-tags:
+    needs: [build-api, build-streamlit]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Update image tags in values.yaml
+        run: |
+          sed -i "s|tag: .*  # replaced by CI with full SHA (api)|tag: ${{ github.sha }}  # replaced by CI with full SHA (api)|" \
+            p6-research-agent/helm/research-agent/values.yaml
+          sed -i "s|tag: .*  # replaced by CI with full SHA (streamlit)|tag: ${{ github.sha }}  # replaced by CI with full SHA (streamlit)|" \
+            p6-research-agent/helm/research-agent/values.yaml
+          # simpler: replace both 'latest' tags
+          sed -i "0,/tag: latest/{s/tag: latest/tag: ${{ github.sha }}/}" \
+            p6-research-agent/helm/research-agent/values.yaml
+          sed -i "0,/tag: latest/{s/tag: latest/tag: ${{ github.sha }}/}" \
+            p6-research-agent/helm/research-agent/values.yaml
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add p6-research-agent/helm/research-agent/values.yaml
+          git commit -m "ci(p6): update image tags to ${GITHUB_SHA::7}" || echo "no changes"
+          git push

@@ -1,0 +1,42 @@
+namespace: research-agent
+
+api:
+  image:
+    repository: ghcr.io/ahembal/research-agent-api
+    tag: latest   # replaced by CI with full SHA
+  replicas: 1
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "1"
+      memory: "1Gi"
+
+streamlit:
+  image:
+    repository: ghcr.io/ahembal/research-agent-streamlit
+    tag: latest   # replaced by CI with full SHA
+  replicas: 1
+
+ollama:
+  image: ollama/ollama:latest
+  model: llama3.1:8b
+  resources:
+    requests:
+      memory: "18Gi"
+      cpu: "2"
+    limits:
+      memory: "20Gi"
+  pvc:
+    storageClass: ceph-rbd
+    size: 10Gi
+  nodeSelector:
+    kubernetes.io/hostname: quick-thrush
+
+chromadb:
+  pvc:
+    storageClass: ceph-rbd
+    size: 5Gi
+
+ncbiEmail: researcher@example.com

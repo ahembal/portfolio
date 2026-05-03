@@ -1,0 +1,6 @@
+apiVersion: v2
+name: research-agent
+description: Life science research agent — API, Streamlit UI, Ollama LLM
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

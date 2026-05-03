@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: research-agent
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/ahembal/portfolio
+    targetRevision: main
+    path: p6-research-agent/helm/research-agent
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: research-agent
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

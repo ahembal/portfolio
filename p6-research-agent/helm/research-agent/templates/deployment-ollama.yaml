@@ -1,0 +1,36 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ollama
+  namespace: {{ .Values.namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ollama
+  template:
+    metadata:
+      labels:
+        app: ollama
+    spec:
+      nodeSelector:
+        {{- toYaml .Values.ollama.nodeSelector | nindent 8 }}
+      containers:
+        - name: ollama
+          image: {{ .Values.ollama.image | quote }}
+          ports:
+            - containerPort: 11434
+          resources:
+            requests:
+              memory: {{ .Values.ollama.resources.requests.memory | quote }}
+              cpu: {{ .Values.ollama.resources.requests.cpu | quote }}
+            limits:
+              memory: {{ .Values.ollama.resources.limits.memory | quote }}
+          volumeMounts:
+            - name: ollama-models
+              mountPath: /root/.ollama
+              subPath: ollama
+      volumes:
+        - name: ollama-models
+          persistentVolumeClaim:
+            claimName: ollama-pvc
