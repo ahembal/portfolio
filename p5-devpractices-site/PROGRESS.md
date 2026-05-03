@@ -71,8 +71,8 @@ The site is still strictly dev practices — no personal bio.
 ### Phase 4 — Lovable build (new, replaces Phase 1-3 delivery)
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 14 | content.md | ✅ Done | All site content written: 6 sections with evidence links, Q10 synthesis. Source of truth for what goes into Lovable. |
-| 15 | lovable-prompt.md | ✅ Done | Full Lovable prompt: design spec (dark/amber, minimal), complete site structure, all copy, technical requirements (React + Tailwind, dark/light toggle, mobile responsive). |
+| 14 | content.md | ✅ Done | A single source-of-truth document for all site content means Lovable can build the full site from one input — no back-and-forth to retrieve scattered content. Writing content before building also forces clarity: if a section is hard to write, the underlying claim is weak. |
+| 15 | lovable-prompt.md | ✅ Done | A complete upfront prompt means Lovable can build the full site in one pass — partial prompts lead to iterative corrections and inconsistent visual output. Including the full copy (not just structure) in the prompt prevents the tool from generating placeholder text that must be replaced later. |
 | 16 | docs/q10-dev-practices.md | ⬜ Todo | Standalone Q10 answer doc — synthesises all sections into a narrative. |
 | 17 | README.md | ⬜ Todo | Project readme explaining what the site is and how it was built. |
 | 18 | Build in Lovable | ⬜ Todo | Paste lovable-prompt.md into Lovable, iterate until design matches spec. |

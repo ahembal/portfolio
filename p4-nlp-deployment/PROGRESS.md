@@ -21,9 +21,9 @@
 ### Phase 1 — Training
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | notebooks/train_pubmed_rct.ipynb | ✅ Done | Kaggle notebook written: load PubMed RCT 200k, fine-tune DistilBERT (3 epochs, T4 GPU, ~45 min), evaluate on test set (target ≥ 85%), push model + metrics.json to s3://nlp-models/pubmed-rct/v1/ via RGW. Add Kaggle Secrets: RGW_ENDPOINT / RGW_ACCESS_KEY / RGW_SECRET_KEY before running. |
-| 2 | Evaluate + record metrics | ✅ Done | accuracy=86.8%, macro F1=0.806. Per-class: METHODS=0.937, RESULTS=0.915, CONCLUSIONS=0.833, BACKGROUND=0.706, OBJECTIVE=0.640. Within expected DistilBERT range (86-88%). |
-| 3 | Push model to Ceph RGW | ✅ Done | RGW upload from Kaggle failed (Tailscale IP unreachable from Google Cloud). Fixed: pushed to HuggingFace Hub first, then pulled to laptop and pushed to RGW. Model at s3://nlp-models/pubmed-rct/v1/. HF token stored in pass homelab/huggingface/kaggle-token. |
+| 1 | notebooks/train_pubmed_rct.ipynb | ✅ Done | DistilBERT is 40% smaller and 60% faster than BERT at 97% of its NLP benchmark performance — right for CPU serving where inference latency matters. Fine-tuning on PubMed abstracts is necessary because general-purpose models don't understand biomedical sentence structure (BACKGROUND / METHODS / RESULTS / CONCLUSIONS / OBJECTIVE are domain-specific categories). |
+| 2 | Evaluate + record metrics | ✅ Done | Macro F1 (not just accuracy) is the correct primary metric because classes are imbalanced and all class errors matter equally — a model that ignores OBJECTIVE entirely would score well on accuracy but poorly on F1. Per-class breakdown shows where the model is weakest (OBJECTIVE=0.640) which informs where additional training data would help most. |
+| 3 | Push model to Ceph RGW | ✅ Done | The two-step path (Kaggle → HuggingFace Hub → RGW) is the correct workaround for Kaggle's network environment — Kaggle runs in Google Cloud where private Tailscale IPs are not routable. HuggingFace Hub is a neutral public intermediary. The model must be in RGW so the serving container can pull it at startup without bundling it in the image. |
 
 ### Phase 2 — Serving
 | # | Step | Status | What & Why |

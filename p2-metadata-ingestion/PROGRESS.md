@@ -9,40 +9,40 @@
 ### Phase 1 — Local stack
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | docker-compose.yml | ✅ Done | API + worker + Redis + Postgres with healthchecks — starts in dependency order. |
-| 2 | src/storage/db.py | ✅ Done | SQLAlchemy async (asyncpg), FileMetadata with UUID PK, status CHECK constraint, server-side timestamps. |
-| 3 | src/storage/s3.py | ✅ Done | boto3 upload wrapper, deterministic key schema `uploads/{yyyy}/{mm}/{dd}/{job_id}/{filename}`. |
-| 4 | src/api/schemas.py | ✅ Done | Pydantic v2 — IngestResponse, JobStatus, FileMetadataOut, FileListResponse, HealthResponse. |
-| 5 | src/api/main.py | ✅ Done | POST /ingest (202), GET /status/{id}, /files, /health, /metrics. Prometheus counters + histogram. |
-| 6 | src/workers/tasks.py | ✅ Done | SHA-256, python-magic MIME detection, RGW upload, status transitions, 3× retry / 30s backoff. |
+| 1 | docker-compose.yml | ✅ Done | Separating API and worker means HTTP response time is unaffected by file processing duration — the API returns 202 immediately. Healthchecks ensure the worker doesn't connect to Redis before it is ready, preventing crash loops on startup. |
+| 2 | src/storage/db.py | ✅ Done | Async SQLAlchemy matches the async FastAPI event loop — a synchronous driver would block the loop during DB writes. Server-side timestamps prevent clock skew when multiple worker instances write concurrently. CHECK constraint on status prevents invalid state transitions from being persisted. |
+| 3 | src/storage/s3.py | ✅ Done | Deterministic key schema means the S3 path can be reconstructed from job metadata alone — no secondary lookup needed to locate a file. Date-based prefixes allow lifecycle policies and partitioned listing without scanning the full bucket. |
+| 4 | src/api/schemas.py | ✅ Done | Separate response models (not ORM models exposed directly) mean the internal DB schema can change without breaking the API contract. Pydantic validates at the boundary — a missing required field fails at startup, not at the first request. |
+| 5 | src/api/main.py | ✅ Done | 202 Accepted is the correct HTTP semantics for an async operation — the request is queued, not yet processed. /health and /metrics must always respond, even under load — they are required by K8s liveness probes and Prometheus respectively. |
+| 6 | src/workers/tasks.py | ✅ Done | SHA-256 provides a content fingerprint for integrity verification and deduplication. MIME detection from bytes (not extension) prevents type spoofing. Exponential backoff avoids hammering a temporarily unavailable S3 endpoint — 3 retries covers transient failures without blocking the worker indefinitely. |
 
 ### Phase 2 — Tests
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 7 | tests/conftest.py | ✅ Done | pytest fixtures: Postgres via testcontainers, async engine, mock Redis, httpx AsyncClient with injected app_state, mock S3, env monkeypatching. |
-| 8 | Test: POST /ingest → job created | ✅ Done | 3 tests: 202 + UUID returned, DB record status=pending, Celery .delay called with correct job_id. |
-| 9 | Test: worker status transitions | ✅ Done | Worker → done (sha256 written, s3_key set, put_object called); worker → failed (S3 error sets status=failed + error_msg). |
-| 10 | Test: /health + /files + /status | ✅ Done | /health ok and degraded paths; /files pagination and status filter; /status 200 and 404. |
+| 7 | tests/conftest.py | ✅ Done | testcontainers runs a real Postgres — it catches constraint violations and schema errors that a mock would miss. httpx AsyncClient tests through the full ASGI stack so middleware, dependency injection, and error handlers are all exercised. Mock S3 is sufficient because upload logic is tested separately in worker tests. |
+| 8 | Test: POST /ingest → job created | ✅ Done | Three separate assertions because they test three different layers — HTTP, persistence, and queue. Splitting them means a failure pinpoints exactly which layer broke. |
+| 9 | Test: worker status transitions | ✅ Done | The failure path is as important as the happy path — a job that fails silently without updating status would appear stuck forever, with no visibility into the cause. |
+| 10 | Test: /health + /files + /status | ✅ Done | Testing the degraded /health path matters because monitoring alerts depend on it — a wrong response here would generate false positives or miss real outages. |
 
 ### Phase 3 — Helm + K8s
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 11 | helm/metadata-ingestion/ chart | ✅ Done | api + worker deployments, service, configmap, HPA (worker), Postgres StatefulSet + PVC, Redis deployment, ArgoCD Application CR. |
-| 12 | k8s/seal-secrets.sh | ✅ Done | Script to generate SealedSecrets for RGW creds + Postgres password. Run once per cluster before deploying. |
-| 13 | Deploy to homelab | ✅ Done | Sealed secrets applied. Helm chart deployed on clever-fly (quick-thrush primary, sought-perch cordoned ISS-009). All 4 pods running: API, Worker, Postgres (Ceph RBD PVC), Redis. Fixed: DATABASE_URL env substitution, RGW endpoint (192.168.1.200), full SHA image tags. |
-| 14 | Smoke test | ✅ Done | POST /ingest → status=done, sha256 written, s3_key `uploads/2026/04/28/…/README.md`. Full pipeline verified end-to-end. |
+| 11 | helm/metadata-ingestion/ chart | ✅ Done | HPA on the worker (not the API) because ingestion volume is the bottleneck — the API is lightweight HTTP. StatefulSet for Postgres preserves PVC identity across pod restarts — a regular Deployment would lose the volume claim. |
+| 12 | k8s/seal-secrets.sh | ✅ Done | The sealed form is encrypted with the cluster's public key and safe to commit to git. Run once per cluster because the sealing key doesn't change between deploys — re-sealing every deploy would be unnecessary. |
+| 13 | Deploy to homelab | ✅ Done | The deployment fixes address cluster-specific constraints documented in known-issues.md. Each fix (DATABASE_URL substitution, RGW endpoint, full SHA tags) makes the chart correct for the target cluster, not just locally. |
+| 14 | Smoke test | ✅ Done | The smoke test verifies the full data path — from HTTP through Celery to RGW — which cannot be verified by unit tests alone. End-to-end confirmation before closing the phase. |
 
 ### Phase 4 — CI/CD
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 15 | .github/workflows/p2-ci.yml | ✅ Done | lint-and-test (ruff + pytest/testcontainers) → build-api + build-worker in parallel → update-tags writes SHAs back to values.yaml. |
-| 16 | k8s/argocd-application.yaml | ✅ Done | Done in Phase 3 — watches helm/metadata-ingestion/ on main, CreateNamespace=true. |
+| 15 | .github/workflows/p2-ci.yml | ✅ Done | Parallel builds reduce CI wall time. update-tags writes the full SHA (not short SHA) because short SHAs can collide and GHCR uses the full digest as the authoritative reference. The tag change in values.yaml is the ArgoCD trigger. |
+| 16 | k8s/argocd-application.yaml | ✅ Done | The Application CR in git means ArgoCD's own configuration is version-controlled — the cluster state is always derivable from git without manual kubectl commands. |
 
 ### Phase 5 — Observability + Docs
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 17 | Prometheus metrics | ✅ Done | API: QUEUE_DEPTH Gauge (queried from Redis on /metrics scrape). Worker: JOB_STATUS_TOTAL Counter, JOB_DURATION Histogram. |
-| 18 | Grafana dashboard | ✅ Done | monitoring/grafana-dashboard.yaml (ConfigMap, auto-discovered by Grafana sidecar). monitoring/service-monitor.yaml. 7 panels: ingest rate, queue depth, job completion rate, job duration p50/p95/p99, API latency p95, worker replicas, failed jobs. |
+| 17 | Prometheus metrics | ✅ Done | Worker metrics use a Counter (not Gauge) for job status because Counters are additive and monotonic — Prometheus rate() and increase() functions work correctly on them. Histogram captures tail latency (p95, p99) that average metrics hide. |
+| 18 | Grafana dashboard | ✅ Done | 7 panels cover the three failure modes that matter: queue buildup (queue depth), processing failures (failed jobs), and latency degradation (duration p95/p99). The dashboard is a ConfigMap so it is version-controlled and deployed with the stack. |
 | 19 | docs/q6-scalability.md | ✅ Done | Written in Phase 1 — volume/velocity/variety analysis with concrete numbers and Prometheus scaling signals. |
 | 20 | docs/architecture.md | ✅ Done | Component roles, full data flow diagram, why Redis + Postgres, failure handling, scaling. |
 | 21 | docs/design-decisions.md | ✅ Done | Rationale behind async queue, testcontainers, single Dockerfile, MIME detection from bytes, task_acks_late. |

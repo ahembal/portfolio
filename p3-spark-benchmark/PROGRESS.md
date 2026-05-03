@@ -18,23 +18,23 @@
 ### Phase 1 — Data generation + Pandas baseline
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | src/fetch_data.py | ✅ Done | Streams real NCBI SRA metadata (not synthetic). ~40M RUN records, updated daily. No auth needed. Fetches 1M rows in ~3 min locally; larger scales staged on HPC. See docs/data-source.md for schema, fetch timing, and data quality notes. |
-| 2 | src/pipeline_pandas.py | ✅ Done | Pandas baseline: filter (live + Bases>0) → broadcast join with platform_lookup → aggregate (Center/technology/year) → cumulative window. Writes Parquet + timing JSON. |
-| 3 | Local baseline runs | ✅ Done | 1M rows: 1.1s, 0.94 M rows/s. Load=0.55s dominates. Compute (filter+join+agg+window)=0.51s. Results in results/pandas_sra_runs_1M.json. |
+| 1 | src/fetch_data.py | ✅ Done | Real NCBI SRA metadata (not synthetic) makes the benchmark reproducible and credible — the dataset has genuine quality issues (nulls, mixed platforms) that test pipeline robustness. NCBI SRA is updated daily and requires no authentication, making it reusable for future runs at larger scale. |
+| 2 | src/pipeline_pandas.py | ✅ Done | Pandas establishes a single-threaded reference performance. Identical logic to the Spark and GPU pipelines means speedup measurements are apples-to-apples — any difference is attributable to the execution engine, not the query. |
+| 3 | Local baseline runs | ✅ Done | The 1M baseline confirms the pipeline is correct before scaling to HPC. Load time dominating compute at 1M is expected — this is the crossover regime where Spark's parallelism overhead would make it slower, not faster. The baseline number anchors all future speedup calculations. |
 
 ### Phase 2 — Spark pipeline on UPPMAX
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 4 | src/pipeline_spark.py | ✅ Done | PySpark version. Broadcast join hint, shuffle partitions tuned per node count. Identical logic to pandas — correctness verified by output diff. |
-| 5 | jobs/uppmax_spark.sh | ✅ Done | SLURM script for Rackham. Account naiss2026-4-384, 4 nodes, runs 10M + 40M at 1/2/4 nodes. |
+| 4 | src/pipeline_spark.py | ✅ Done | The broadcast join hint eliminates shuffle for the small platform_lookup table — it is the single highest-impact optimization. Shuffle partitions tuned per node count avoids over-partitioning at low node counts (scheduling overhead) and under-partitioning at high counts (stragglers). |
+| 5 | jobs/uppmax_spark.sh | ✅ Done | Running 10M and 40M rows at 1/2/4 nodes in the same script gives the data for strong scaling curves (fixed problem size, more nodes) and shows the dataset size at which Spark's parallelism advantage over Pandas begins. |
 | 6 | Results at 10M + 40M rows | ⬜ Todo | Submit to UPPMAX, collect timing JSONs. |
 | 7 | Scaling experiment 1→4 nodes | ⬜ Todo | Already built into uppmax_spark.sh — runs automatically at each node count. |
 
 ### Phase 3 — GPU pipeline on Dardel
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 8 | src/pipeline_gpu.py | ✅ Done | cuDF version with ROCm backend (Dardel uses AMD MI250X, not NVIDIA). Falls back to pandas if cuDF unavailable (for local testing). |
-| 9 | jobs/dardel_gpu.sh | ✅ Done | SLURM script for Dardel GPU. Account naiss2026-4-384, MI250X, module load RAPIDS/24.06-rocm-6.0. Runs 10M + 40M rows. |
+| 8 | src/pipeline_gpu.py | ✅ Done | cuDF on AMD MI250X (ROCm) matches the pandas and Spark query logic exactly — same correctness guarantee. The pandas fallback allows local testing without a GPU, so the code can be validated before the HPC job runs. |
+| 9 | jobs/dardel_gpu.sh | ✅ Done | Dardel's MI250X GPUs are among the most powerful available on NAISS — this is the tier where GPU acceleration should show the largest speedup over Pandas and Spark. Running the same 10M/40M sizes as UPPMAX enables direct comparison across all three engines. |
 | 10 | Results at 10M + 40M rows | ⬜ Todo | Submit to Dardel, collect timing JSONs. |
 
 ### Phase 4 — Analysis + Docs
