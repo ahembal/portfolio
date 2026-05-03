@@ -15,7 +15,7 @@ import io
 import struct
 import zlib
 
-from locust import HttpUser, task, between
+from locust import HttpUser, between, task
 
 
 def _make_patch_png(width: int = 96, height: int = 96) -> bytes:

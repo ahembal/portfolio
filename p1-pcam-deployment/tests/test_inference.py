@@ -9,15 +9,12 @@
 #   pytest tests/ -v
 
 import io
-import sys
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
 from fastapi.testclient import TestClient
 from PIL import Image
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -60,6 +57,7 @@ def client():
 
     # Insert mock state directly — same keys that lifespan populates
     import torch
+
     from serving.main import app, app_state
     app_state["model"]  = mock_model
     app_state["device"] = torch.device("cpu")

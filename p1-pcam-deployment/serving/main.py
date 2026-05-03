@@ -38,22 +38,21 @@ import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 import torch
 import torch.nn as nn
-from torchvision import models, transforms
-from PIL import Image
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
+from PIL import Image
 from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    REGISTRY,
     Counter,
     Histogram,
     Info,
     generate_latest,
-    CONTENT_TYPE_LATEST,
-    REGISTRY,
 )
+from torchvision import models, transforms
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "infra" / "ceph-rgw"))
 from boto3_config import RGWConfig, get_s3_client

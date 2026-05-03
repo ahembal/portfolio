@@ -27,6 +27,7 @@ dev = [
 [tool.ruff]
 line-length = 88
 target-version = "py310"
+exclude = ["*.ipynb"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I"]   # pycodestyle, pyflakes, isort
