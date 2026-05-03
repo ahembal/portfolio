@@ -33,21 +33,21 @@ Design principles applied:
    work happens inside functions called explicitly.
 """
 
-import os
-import time
 import json
 import logging
-from dataclasses import dataclass, field
+import os
+import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
+from datasets import load_dataset
+from sklearn.metrics import confusion_matrix, f1_score, roc_auc_score
 from torch.utils.data import DataLoader
 from torchvision import models, transforms
-from datasets import load_dataset
-from sklearn.metrics import roc_auc_score, f1_score, confusion_matrix
-import numpy as np
 
 logging.basicConfig(
     level=logging.INFO,
