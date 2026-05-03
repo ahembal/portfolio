@@ -250,6 +250,25 @@ Evidence for each characteristic:
 
 ---
 
+---
+
+## 12. Container registry visibility strategy
+
+**Decision:** container images are published as public on GHCR.
+
+**Why this is acceptable here:**
+The images contain only application code and Python dependencies — no model weights, no credentials, no patient data. Secrets are injected at runtime via Kubernetes Sealed Secrets. The source code is already public on GitHub, so image inspection reveals nothing that isn't already visible. The CI pipeline uses `GITHUB_TOKEN` with `packages: write` scope, which is GitHub's recommended pattern for public packages — no personal PAT or long-lived service account token required.
+
+**What would change this decision:**
+- Model weights trained on licensed or proprietary datasets — weights would need to remain private or be stripped from the image and pulled at runtime (current architecture already does this for the model file)
+- Images containing patient data, genomic sequences, or any PII — must be private; access must be logged; GDPR Art. 5(1)(f) and ISO 27001 A.8.10 apply
+- Institutional IP restrictions — check funder agreements (EU Horizon, VR, VGR) before publishing
+
+**Academic context:**
+For research projects on public datasets (PubMed, UniProt, PatchCamelyon), public images align with FAIR principles and open science mandates common in Swedish/EU-funded research. SciLifeLab and most NAISS-funded projects are expected to make code and derived artefacts openly available unless data sensitivity prevents it. If working with sensitive data, the correct pattern is a private registry with a dedicated service account (not a personal PAT — PATs expire and break CI when the person leaves) and OIDC-based keyless auth where the registry supports it.
+
+---
+
 ## Deferred / out-of-scope items
 
 | Item | Reason deferred | Reference |
