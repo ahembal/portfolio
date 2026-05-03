@@ -3,10 +3,8 @@ Tests for p6 tools — PubMed, UniProt, vector store.
 All external HTTP calls are mocked — no network required.
 """
 
-import json
 from unittest.mock import MagicMock, patch
 
-import pytest
 
 
 # ---------------------------------------------------------------------------

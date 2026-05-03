@@ -19,7 +19,6 @@ agent citations trustworthy and verifiable.
 """
 
 import time
-from typing import Optional
 
 from Bio import Entrez, Medline
 

@@ -19,8 +19,6 @@ Why semantic search and not keyword search:
 """
 
 import hashlib
-from pathlib import Path
-from typing import Optional
 
 import chromadb
 from chromadb.config import Settings
