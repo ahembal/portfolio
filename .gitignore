@@ -57,3 +57,5 @@ p3-spark-benchmark/results/*.csv
 .claude/
 p1-pcam-deployment/SPEC.md
 p1-pcam-deployment/artifacts/
+TODO.local
+*.local

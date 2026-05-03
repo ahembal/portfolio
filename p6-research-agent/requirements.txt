@@ -1,0 +1,25 @@
+# Core agent framework
+langchain==0.3.25
+langchain-community==0.3.24
+langgraph==0.4.3
+
+# LLM via Ollama
+langchain-ollama==0.3.2
+
+# Tools
+biopython==1.84               # PubMed Entrez API
+requests==2.32.3              # UniProt REST API
+chromadb==1.0.7               # vector store
+sentence-transformers==5.0.0  # embeddings for RAG
+
+# Serving
+fastapi==0.115.12
+uvicorn==0.34.2
+pydantic==2.11.4
+prometheus-client==0.21.1
+
+# Streamlit UI
+streamlit==1.45.1
+
+# Utils
+python-dotenv==1.1.0
