@@ -50,7 +50,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -q fastapi httpx pytest pytest-cov pillow numpy ruff
+          pip install -q fastapi httpx pytest pytest-cov pillow numpy ruff prometheus-client boto3
           pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
         working-directory: p1-pcam-deployment
 
@@ -63,7 +63,9 @@ jobs:
       - name: Test — pytest
         # Tests mock out the model and S3 client so no GPU or real RGW needed.
         # --cov produces a coverage report shown in the Actions summary.
-        run: pytest tests/ -v --tb=short --cov=serving --cov-report=term-missing
+        # PYTHONPATH: serving/ resolves `from serving.main import …`;
+        # ../infra/ceph-rgw resolves `from boto3_config import …` in main.py.
+        run: PYTHONPATH=serving:../infra/ceph-rgw pytest tests/ -v --tb=short --cov=serving --cov-report=term-missing
         working-directory: p1-pcam-deployment
 
   # ---------------------------------------------------------------------------

@@ -31,11 +31,12 @@ def _make_jpeg_bytes(width: int = 96, height: int = 96) -> bytes:
 
 
 def _make_mock_model():
-    """Return a mock nn.Module whose forward() outputs a fixed [normal] logit."""
+    """Return a mock nn.Module whose forward() outputs a single logit."""
     import torch
     mock = MagicMock()
-    # logits shape (1, 2): class 0 (normal) wins
-    mock.return_value = torch.tensor([[2.0, 0.5]])
+    # Model uses num_classes=1 — outputs one raw logit per image.
+    # sigmoid(-2.0) = 0.12 → P(tumour) < 0.5 → label "normal".
+    mock.return_value = torch.tensor([[-2.0]])
     return mock
 
 
