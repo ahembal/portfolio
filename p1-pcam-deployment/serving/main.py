@@ -89,22 +89,23 @@ log = logging.getLogger(__name__)
 #   a label set, not a time series. Useful for correlating metric changes
 #   with deployments.
 
-REQUEST_COUNT = Counter(
-    "pcam_requests_total",
-    "Total number of requests by endpoint and HTTP status",
-    ["endpoint", "status"],
-)
-
-REQUEST_LATENCY = Histogram(
-    "pcam_request_latency_ms",
-    "Request latency in milliseconds",
-    ["endpoint"],
-    # Buckets tuned for CPU inference: p50 ~20 ms, p99 ~200 ms.
-    # Wide upper buckets catch occasional slow requests without distorting
-    # the histogram (Prometheus counts all observations above the last bucket
-    # in the +Inf bucket automatically).
-    buckets=[5, 10, 25, 50, 100, 200, 500, 1000, 2000],
-)
+try:
+    REQUEST_COUNT = Counter(
+        "pcam_requests_total",
+        "Total number of requests by endpoint and HTTP status",
+        ["endpoint", "status"],
+    )
+    REQUEST_LATENCY = Histogram(
+        "pcam_request_latency_ms",
+        "Request latency in milliseconds",
+        ["endpoint"],
+        # Buckets tuned for CPU inference: p50 ~20 ms, p99 ~200 ms.
+        buckets=[5, 10, 25, 50, 100, 200, 500, 1000, 2000],
+    )
+except ValueError:
+    # Already registered — happens when the module is re-imported in tests.
+    REQUEST_COUNT = REGISTRY._names_to_collectors.get("pcam_requests_total")
+    REQUEST_LATENCY = REGISTRY._names_to_collectors.get("pcam_request_latency_ms")
 
 MODEL_INFO = Info(
     "pcam_model",
