@@ -358,3 +358,37 @@ unverifiable.
 | PubMed rate limit (3 req/s) | Slow for many fetch calls | Use API key for 10 req/s |
 | Non-deterministic | Same question may produce different tool order | LLM temperature controls this |
 | Uncalibrated confidence | No certainty scores on citations | LLM admits uncertainty in prompt |
+
+---
+
+## CI/CD pipeline
+
+```
+git push to main (p6-research-agent/** changed)
+        │
+        ▼
+GitHub Actions — test
+  ruff check src/ tests/
+  pytest tests/ -m "not e2e"   ← unit tests only, no Ollama needed
+        │ passes
+        ▼
+GitHub Actions — build-api + build-streamlit (parallel)
+  docker build -f Dockerfile      → ghcr.io/ahembal/research-agent-api:<full-SHA>
+  docker build -f Dockerfile.streamlit → ghcr.io/ahembal/research-agent-streamlit:<full-SHA>
+        │
+        ▼
+GitHub Actions — update-tags
+  sed values.yaml → new SHA (both images)
+  git pull --rebase && git push
+        │
+        ▼
+ArgoCD detects drift → helm upgrade research-agent
+  api + streamlit rolling update
+  Ollama unchanged (upstream image, no rebuild)
+```
+
+**Key points:**
+- E2E tests (require Ollama) are excluded from CI with `-m "not e2e"` — run manually before K8s deployment
+- Two images built in parallel (api and streamlit) because they have different dependencies and change at different rates
+- Ollama uses the upstream `ollama/ollama:latest` image — never rebuilt in CI
+- Both GHCR packages (`research-agent-api`, `research-agent-streamlit`) need the `portfolio` repo added under "Manage Actions access" with **Write** permission before the first CI push — see p1 `deployment-troubleshooting.md §15` for the procedure

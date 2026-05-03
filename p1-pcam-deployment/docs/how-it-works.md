@@ -175,3 +175,38 @@ normalisation silently degrades accuracy.
 | CPU inference ~15-20ms | Not suitable for whole-slide scanning | GPU serving needed at scale |
 | No batch endpoint | One patch per request | v1 limitation |
 | RGW required at startup | Container fails if RGW unreachable | Kubernetes restart policy handles recovery |
+
+---
+
+## CI/CD pipeline
+
+```
+git push to main (p1-pcam-deployment/** changed)
+        │
+        ▼
+GitHub Actions — lint-and-test
+  ruff check serving/main.py train/train.py
+  pytest tests/ (torch-cpu, real FastAPI stack, mocked model + S3)
+        │ passes
+        ▼
+GitHub Actions — build-and-push
+  docker buildx build --cache-type=gha
+  push ghcr.io/ahembal/pcam-inference:<full-SHA>
+        │
+        ▼
+GitHub Actions — update-tag
+  sed values.yaml → new SHA
+  git pull --rebase && git push
+        │
+        ▼
+ArgoCD detects drift in helm/pcam-inference/values.yaml
+  helm upgrade pcam ./helm/pcam-inference
+  rolling update: new pod pulls model from RGW → /health 200
+  old pod terminated
+```
+
+**Key points:**
+- Tests run before build — a failing test blocks the image push
+- Full SHA (not short SHA) is written to `values.yaml` — GHCR uses the full digest as the authoritative reference; short SHAs can collide
+- `git pull --rebase` before the tag push — without this, concurrent CI runs reject each other's pushes
+- The GHCR package (`ghcr.io/ahembal/pcam-inference`) must have the `portfolio` repository added under "Manage Actions access" with **Write** permission — see `deployment-troubleshooting.md §15` for how this was set up

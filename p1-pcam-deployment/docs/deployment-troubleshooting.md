@@ -356,3 +356,94 @@ homelab; not acceptable in production.
 correct IP SANs for each node. This is the same root cause as the API server TLS SAN
 issue (Step 17) — both need kubeadm cert rotation. The two fixes should be done together
 to avoid rotating certs twice.
+
+---
+
+## 15. GitHub Actions — GHCR push 403 (workflow permissions + package access)
+
+**Symptom:** CI build-and-push job fails:
+```
+ERROR: failed to push ghcr.io/ahembal/pcam-inference:<sha>:
+unexpected status from HEAD request: 403 Forbidden
+```
+
+**Root cause (two-part):**
+
+Part A — repo workflow permissions default to read: GitHub sets `default_workflow_permissions` to `read` for new repos. The `GITHUB_TOKEN` cannot push images or commit back to the repo.
+
+Fix:
+```bash
+gh api --method PUT repos/ahembal/portfolio/actions/permissions/workflow \
+  --field default_workflow_permissions=write \
+  --field can_approve_pull_request_reviews=false
+```
+
+Part B — package not linked to repo: Even with write permissions, a new GHCR package is private and not linked to the repository. The `GITHUB_TOKEN` cannot push to it. This cannot be fixed via API for user-owned packages — requires the GitHub UI.
+
+Fix: Go to `github.com/users/ahembal/packages/container/<image-name>/settings` → **Manage Actions access** → add the `portfolio` repository with **Write** access.
+
+**Note:** Do this for every new image before the first CI push (`pcam-inference`, `metadata-api`, `metadata-worker`, `research-agent-api`, `research-agent-streamlit`). Create the package first with a dummy push if it doesn't exist yet:
+```bash
+docker tag hello-world ghcr.io/ahembal/<image-name>:init
+docker push ghcr.io/ahembal/<image-name>:init
+```
+
+---
+
+## 16. GitHub Actions — concurrent runs reject each other's tag-update push
+
+**Symptom:** `update-tags` job fails:
+```
+! [rejected] main -> main (fetch first)
+error: failed to push some refs
+```
+
+**Root cause:** Two CI runs triggered by the same push (e.g. p1 and p2 both changed) both try to commit and push the updated `values.yaml` tag to `main` at the same time. The second push is rejected because the first has already advanced the ref.
+
+**Fix:** Added `git pull --rebase` before the push in both CI workflows:
+```yaml
+git pull --rebase && git push
+```
+
+---
+
+## 17. CI — ruff fails on notebook E501 line-too-long
+
+**Symptom:** `ruff check` fails on `train/kaggle_train.ipynb` with E501 errors (lines > 88 chars inside print statements and f-strings that cannot be wrapped without breaking the code).
+
+**Fix:** Excluded notebooks from ruff in `pyproject.toml`:
+```toml
+[tool.ruff]
+exclude = ["*.ipynb"]
+```
+
+---
+
+## 18. CI — pytest cannot import `serving` or `boto3_config`
+
+**Symptom:**
+```
+ModuleNotFoundError: No module named 'serving'
+ModuleNotFoundError: No module named 'boto3_config'
+```
+
+**Root cause:** `pytest` runs from `p1-pcam-deployment/` with neither `serving/` nor `infra/ceph-rgw/` on `sys.path`. `serving/main.py` imports `from boto3_config import ...`, which lives in `infra/ceph-rgw/` — outside the project directory.
+
+**Fix:** Set `PYTHONPATH` explicitly in the CI test step:
+```yaml
+run: PYTHONPATH=serving:../infra/ceph-rgw pytest tests/ ...
+working-directory: p1-pcam-deployment
+```
+
+---
+
+## 19. CI — Prometheus metric re-registration error in pytest
+
+**Symptom:**
+```
+ValueError: Duplicated timeseries in CollectorRegistry: {'pcam_requests_total', ...}
+```
+
+**Root cause:** `serving/main.py` registers Prometheus metrics at module level. pytest imports the module once per test class that calls `from serving.main import ...`, triggering re-registration on each import.
+
+**Fix:** Wrapped metric registration in `try/except ValueError` in `serving/main.py`. On re-import, the except block retrieves the already-registered collector from `REGISTRY` instead of creating a new one.
