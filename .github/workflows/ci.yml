@@ -50,10 +50,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -q \
-            fastapi httpx pytest pytest-cov \
-            pillow numpy ruff \
-            torch torchvision --index-url https://download.pytorch.org/whl/cpu
+          pip install -q fastapi httpx pytest pytest-cov pillow numpy ruff
+          pip install -q torch torchvision --index-url https://download.pytorch.org/whl/cpu
         working-directory: p1-pcam-deployment
 
       - name: Lint — ruff
