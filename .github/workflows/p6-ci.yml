@@ -20,7 +20,7 @@ jobs:
       - run: pip install -r requirements.txt
       - run: pip install pytest ruff
       - run: ruff check src/ tests/
-      - run: pytest tests/ -v
+      - run: pytest tests/ -v -m "not e2e"
 
   build-api:
     needs: test
@@ -84,4 +84,4 @@ jobs:
           git config user.email "github-actions@github.com"
           git add p6-research-agent/helm/research-agent/values.yaml
           git commit -m "ci(p6): update image tags to ${GITHUB_SHA::7}" || echo "no changes"
-          git push
+          git pull --rebase && git push

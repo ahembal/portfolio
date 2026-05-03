@@ -7,6 +7,26 @@ don't affect the real corpus.
 
 ---
 
+## Test tiers
+
+Tests are split into two tiers:
+
+**Unit tests** (run in CI on every push):
+```bash
+pytest tests/ -v -m "not e2e"
+```
+No external dependencies. PubMed and UniProt calls are mocked. ChromaDB uses a temporary directory. The agent graph routing tests replace tool functions with `MagicMock`. These tests run in seconds on any machine without Ollama or network access.
+
+**E2E tests** (run manually against a real deployment):
+```bash
+pytest tests/ -v -m e2e
+```
+Marked with `@pytest.mark.e2e`. Require Ollama running locally with `llama3.1:8b` pulled. Call the real agent loop end-to-end — LLM reasoning, tool dispatch, citation extraction. Run these before deploying to K8s to confirm the full system works, not on every commit.
+
+This split is standard practice: unit tests gate every push (fast, deterministic), E2E tests gate deployments (slow, require live infrastructure). Running E2E tests in CI would make every push take minutes and fail whenever Ollama is unavailable.
+
+---
+
 ## Agent graph (test_agent.py)
 
 ### test_router_goes_to_act_when_tool_calls_present
