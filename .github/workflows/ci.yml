@@ -137,4 +137,4 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add p1-pcam-deployment/helm/pcam-inference/values.yaml
           git diff --staged --quiet || git commit -m "ci(p1): update image tag to ${SHORT_SHA}"
-          git push
+          git pull --rebase && git push
