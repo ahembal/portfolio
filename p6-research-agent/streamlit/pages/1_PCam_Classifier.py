@@ -34,29 +34,27 @@ with st.sidebar:
 
 st.markdown("#### Try a sample patch")
 cols = st.columns(len(SAMPLES))
-selected_sample = None
 for col, (label, fname) in zip(cols, SAMPLES.items()):
     path = DEMO_DIR / fname
     if path.exists():
         col.image(str(path), caption=label, width=96)
         if col.button(f"Use {label}"):
-            selected_sample = (label, path.read_bytes())
+            st.session_state["image_bytes"] = path.read_bytes()
+            st.session_state["image_name"]  = fname
 
 st.markdown("#### Or upload your own")
 uploaded = st.file_uploader(
     "Upload a 96×96 histology patch (JPEG or PNG)",
     type=["jpg", "jpeg", "png"],
 )
+if uploaded:
+    st.session_state["image_bytes"] = uploaded.getvalue()
+    st.session_state["image_name"]  = uploaded.name
 
-image_bytes = None
-image_name  = None
-if selected_sample:
-    image_name, image_bytes = selected_sample
-    st.image(image_bytes, caption=f"Sample: {image_name}", width=200)
-elif uploaded:
-    image_bytes = uploaded.getvalue()
-    image_name  = uploaded.name
-    st.image(image_bytes, caption="Uploaded patch", width=200)
+image_bytes = st.session_state.get("image_bytes")
+image_name  = st.session_state.get("image_name", "patch.png")
+if image_bytes:
+    st.image(image_bytes, caption=image_name, width=200)
 
 if image_bytes and st.button("Classify"):
         with st.spinner("Running inference…"):
