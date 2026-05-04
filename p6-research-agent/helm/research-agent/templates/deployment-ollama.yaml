@@ -15,11 +15,26 @@ spec:
     spec:
       nodeSelector:
         {{- toYaml .Values.ollama.nodeSelector | nindent 8 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: ollama
           image: {{ .Values.ollama.image | quote }}
           ports:
             - containerPort: 11434
+          env:
+            - name: OLLAMA_MODELS
+              value: /models
+            - name: HOME
+              value: /models
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
           resources:
             requests:
               memory: {{ .Values.ollama.resources.requests.memory | quote }}
@@ -28,7 +43,7 @@ spec:
               memory: {{ .Values.ollama.resources.limits.memory | quote }}
           volumeMounts:
             - name: ollama-models
-              mountPath: /root/.ollama
+              mountPath: /models
               subPath: ollama
       volumes:
         - name: ollama-models

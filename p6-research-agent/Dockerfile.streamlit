@@ -1,7 +1,10 @@
 FROM python:3.10-slim
+RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
 WORKDIR /app
 RUN pip install --no-cache-dir streamlit requests
 COPY streamlit/ streamlit/
+RUN chown -R appuser:appuser /app
+USER appuser
 EXPOSE 8501
 ENV PYTHONPATH=/app
 CMD ["streamlit", "run", "streamlit/app.py", "--server.port=8501", "--server.address=0.0.0.0"]

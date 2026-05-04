@@ -93,3 +93,34 @@ volumeMounts:
     subPath: chromadb
 ```
 See ISS-006 in `runbooks/known-issues.md` for full details.
+
+---
+
+## 7. PodSecurity "restricted" violations — missing securityContext
+
+**Symptom:** `helm install` succeeds but warnings appear for all three deployments:
+```
+would violate PodSecurity "restricted:latest":
+  allowPrivilegeEscalation != false
+  unrestricted capabilities (must drop ALL)
+  runAsNonRoot != true
+  seccompProfile not set
+```
+
+**Root cause:** The Helm chart templates did not set `securityContext` on pods or containers. The `research-agent` namespace has PodSecurity `restricted:latest` policy enforced by the cluster.
+
+**Fix — api and streamlit deployments:**
+- Added pod-level `securityContext`: `runAsNonRoot: true`, `runAsUser: 1000`, `fsGroup: 1000`, `seccompProfile.type: RuntimeDefault`
+- Added container-level `securityContext`: `allowPrivilegeEscalation: false`, `capabilities.drop: ["ALL"]`
+- Added `USER 1000` to both Dockerfiles — without this, `runAsNonRoot: true` would fail at runtime because the image still defaults to root
+
+**Fix — Ollama deployment:**
+- The upstream `ollama/ollama` image mounts models to `/root/.ollama` and runs as root by default
+- Set `OLLAMA_MODELS=/models` and `HOME=/models` env vars to redirect the model directory away from `/root`
+- Changed `volumeMount.mountPath` to `/models` to match
+- Added the same pod and container securityContext as api/streamlit
+
+**Why this matters:**
+Running containers as root is a significant attack surface — if the container is compromised, the attacker has root inside the pod and can potentially escape to the node. `capabilities.drop: ALL` and `allowPrivilegeEscalation: false` are baseline hardening required by CIS Kubernetes Benchmark 5.2.x and NIST SP 800-190. The `seccompProfile: RuntimeDefault` enables kernel syscall filtering at no performance cost.
+
+**References:** CIS K8s Benchmark 5.2.3, 5.2.6, 5.2.7 · NIST SP 800-190 §4.4 · ISO 27001:2022 A.8.9
