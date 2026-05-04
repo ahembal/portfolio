@@ -1,3 +1,4 @@
+import asyncio
 import json
 import os
 import time
@@ -54,9 +55,11 @@ async def query(req: QueryRequest):
 
     try:
         graph = _state["graph"]
-        result = graph.invoke(
-            {"messages": [HumanMessage(content=req.question)]},
-            config={"recursion_limit": req.max_steps * 2},
+        invoke_input = {"messages": [HumanMessage(content=req.question)]}
+        invoke_config = {"recursion_limit": req.max_steps * 2}
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None, lambda: graph.invoke(invoke_input, config=invoke_config)
         )
     except Exception as exc:
         QUERY_ERRORS.inc()
