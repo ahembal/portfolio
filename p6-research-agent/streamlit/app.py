@@ -78,6 +78,25 @@ st.set_page_config(page_title="Research Agent", layout="wide")
 st.title("Life Science Research Agent")
 st.caption("Powered by Llama 3.1 8B · PubMed · UniProt · Local RAG corpus")
 
+with st.sidebar:
+    st.header("Available tools")
+    st.markdown("""
+**🔍 PubMed search**
+Searches NCBI PubMed for biomedical literature by keyword.
+
+**📄 PubMed fetch**
+Retrieves the full abstract and metadata for a specific article by PMID.
+
+**🧬 UniProt lookup**
+Looks up a protein or gene in UniProt — returns domains, diseases, and function.
+
+**📚 RAG corpus search**
+Searches a local vector store of pre-indexed background documents.
+""")
+    st.divider()
+    st.caption("Citations appear inline as `[PMID:xxxxx]` or `[UniProt:Pxxxxx]`.")
+    st.caption("First query may take 60–90 s (CPU inference).")
+
 question = st.text_input(
     "Research question",
     placeholder="What is known about TP53 mutations in glioblastoma?",

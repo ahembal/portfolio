@@ -71,6 +71,31 @@ async def query(req: QueryRequest):
     messages = result["messages"]
     answer = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
 
+    # Llama 3.1 8B in tool-use mode emits empty content when done.
+    # Synthesise an answer from tool results using a plain LLM call (no tools).
+    if not answer.strip():
+        from langchain_core.messages import HumanMessage as HM, ToolMessage as TM
+        from langchain_ollama import ChatOllama
+        tool_summary = "\n".join(
+            f"[{m.name}]: {m.content[:800]}"
+            for m in messages if isinstance(m, TM)
+        )
+        synth_prompt = (
+            f"Based on the following tool results, answer the question: {req.question}\n\n"
+            f"{tool_summary}\n\n"
+            "Cite sources inline as [PMID:xxxxx] or [UniProt:Pxxxxx]. "
+            "Be concise and accurate."
+        )
+        llm = ChatOllama(
+            model=os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
+            base_url=os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
+        )
+        synth = await asyncio.get_event_loop().run_in_executor(
+            None, lambda: llm.invoke([HM(content=synth_prompt)])
+        )
+        answer = synth.content
+        answer = synth.content
+
     # Extract citations and steps from tool messages
     citations: list[Citation] = []
     steps: list[StepRecord] = []
