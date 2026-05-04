@@ -3,7 +3,7 @@ namespace: research-agent
 api:
   image:
     repository: ghcr.io/ahembal/research-agent-api
-    tag: 84af5a379c2fb12387f7c535470df09601f9a17d   # replaced by CI with full SHA
+    tag: 8f572f7e921c7d328cac1f0889ef9ed3b451aac1   # replaced by CI with full SHA
   replicas: 1
   resources:
     requests:
@@ -16,7 +16,7 @@ api:
 streamlit:
   image:
     repository: ghcr.io/ahembal/research-agent-streamlit
-    tag: 84af5a379c2fb12387f7c535470df09601f9a17d   # replaced by CI with full SHA
+    tag: 8f572f7e921c7d328cac1f0889ef9ed3b451aac1   # replaced by CI with full SHA
   replicas: 1
 
 ollama:
