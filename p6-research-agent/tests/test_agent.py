@@ -46,12 +46,13 @@ class TestGraphRouting:
         }
         assert _router(state) == "act"
 
-    def test_router_goes_to_respond_when_no_tool_calls(self):
+    def test_router_goes_to_end_when_no_tool_calls(self):
+        from langgraph.graph import END
         from src.agent.graph import _router, AgentState
         state: AgentState = {
             "messages": [AIMessage(content="TP53 is a tumour suppressor.")]
         }
-        assert _router(state) == "respond"
+        assert _router(state) == END
 
     def test_act_node_calls_pubmed_search(self):
         from src.agent.graph import act, AgentState

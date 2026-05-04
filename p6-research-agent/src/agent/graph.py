@@ -1,9 +1,10 @@
 """
-LangGraph agent: Reason → Act → Respond loop.
+LangGraph agent: Reason → Act loop (standard ReAct pattern).
 
-State carries the full conversation history and all tool outputs so every
-node has complete context. Control flow is explicit: the router decides after
-each Act step whether to loop back (more tool calls pending) or move to Respond.
+The LLM reasons and either calls tools or produces a final answer.
+When it stops calling tools its last message IS the answer — no
+separate synthesis step needed. A second LLM call without tools
+reliably returns empty content with Llama 3.1 8B.
 """
 
 import json
@@ -151,27 +152,16 @@ def act(state: AgentState) -> dict:
     return {"messages": tool_messages}
 
 
-def respond(state: AgentState) -> dict:
-    """Final answer — call the LLM one more time without tools to synthesise."""
-    llm = ChatOllama(
-        model=os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
-        base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-    )
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}] + state["messages"]
-    response = llm.invoke(messages)
-    return {"messages": [response]}
-
-
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
 
 def _router(state: AgentState) -> str:
-    """After Reason: if the LLM emitted tool calls → Act, otherwise → Respond."""
+    """After Reason: tool calls pending → Act, otherwise → END."""
     last = state["messages"][-1]
     if isinstance(last, AIMessage) and last.tool_calls:
         return "act"
-    return "respond"
+    return END
 
 
 # ---------------------------------------------------------------------------
@@ -183,13 +173,11 @@ def build_graph() -> StateGraph:
 
     g.add_node("reason", reason)
     g.add_node("act", act)
-    g.add_node("respond", respond)
 
     g.set_entry_point("reason")
 
-    g.add_conditional_edges("reason", _router, {"act": "act", "respond": "respond"})
-    g.add_edge("act", "reason")   # loop: Act → Reason → Act → … until no tool calls
-    g.add_edge("respond", END)
+    g.add_conditional_edges("reason", _router, {"act": "act", END: END})
+    g.add_edge("act", "reason")
 
     return g.compile()
 

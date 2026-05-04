@@ -35,11 +35,11 @@ This split is standard practice: unit tests gate every push (fast, deterministic
 Builds an AIMessage with a `tool_calls` list. Checks `_router` returns `"act"`.
 If the conditional edge logic breaks, the graph would skip tool execution.
 
-### test_router_goes_to_respond_when_no_tool_calls
+### test_router_goes_to_end_when_no_tool_calls
 **Type:** Unit | **What it catches:** Router correctly identifies a finished reasoning step
 
 Builds an AIMessage with plain text content and no tool calls. Checks `_router`
-returns `"respond"`. Without this, the agent would loop forever even after the
+returns `END`. Without this, the agent would loop forever even after the
 LLM produces its final answer.
 
 ### test_act_node_calls_pubmed_search
