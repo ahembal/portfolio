@@ -79,14 +79,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Update image tags in values.yaml
         run: |
-          sed -i "s|tag: .*  # replaced by CI with full SHA (api)|tag: ${{ github.sha }}  # replaced by CI with full SHA (api)|" \
-            p6-research-agent/helm/research-agent/values.yaml
-          sed -i "s|tag: .*  # replaced by CI with full SHA (streamlit)|tag: ${{ github.sha }}  # replaced by CI with full SHA (streamlit)|" \
-            p6-research-agent/helm/research-agent/values.yaml
-          # simpler: replace both 'latest' tags
-          sed -i "0,/tag: latest/{s/tag: latest/tag: ${{ github.sha }}/}" \
-            p6-research-agent/helm/research-agent/values.yaml
-          sed -i "0,/tag: latest/{s/tag: latest/tag: ${{ github.sha }}/}" \
+          sed -i "s|tag: .*  # replaced by CI with full SHA|tag: ${{ github.sha }}   # replaced by CI with full SHA|g" \
             p6-research-agent/helm/research-agent/values.yaml
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
