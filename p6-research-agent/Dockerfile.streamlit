@@ -1,8 +1,9 @@
 FROM python:3.10-slim
 RUN groupadd -r appuser && useradd -r -g appuser -u 1000 appuser
 WORKDIR /app
-RUN pip install --no-cache-dir streamlit requests
+RUN pip install --no-cache-dir streamlit requests pillow
 COPY streamlit/ streamlit/
+# demo images are bundled inside streamlit/demo/ (copied from p1-pcam-deployment/demo/)
 RUN chown -R appuser:appuser /app
 USER appuser
 EXPOSE 8501
