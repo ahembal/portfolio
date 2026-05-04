@@ -11,3 +11,5 @@ data:
   API_URL: "http://research-agent-api:8000"
   TORCHINDUCTOR_CACHE_DIR: "/tmp/torchinductor"
   TRANSFORMERS_CACHE: "/tmp/hf_cache"
+  STREAMLIT_HOME: "/tmp"
+  HOME: "/tmp"

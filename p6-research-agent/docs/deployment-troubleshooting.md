@@ -143,3 +143,29 @@ KeyError: 'getpwuid(): uid not found: 1000'
 Also added `TRANSFORMERS_CACHE=/tmp/hf_cache` preemptively — HuggingFace Transformers has the same pattern.
 
 **Note:** This is the same root cause as p1 issue §10. Any Python image running as a non-root UID without a matching `/etc/passwd` entry will hit this if torch or transformers is imported.
+
+---
+
+## 9. Liveness probe kills API pod during long queries
+
+**Symptom:** API pod enters CrashLoopBackOff after receiving a query. Logs show clean shutdown (exit code 0). `kubectl describe pod` shows:
+```
+Liveness probe failed: Get "http://...:8000/health": context deadline exceeded
+```
+
+**Root cause:** The default liveness probe `timeoutSeconds` is 1 second. During a query, the API is blocked for 40–60 seconds waiting for Ollama (CPU inference). The liveness probe fires during this window, times out, and K8s kills the pod — even though the pod is healthy and working correctly.
+
+**Fix:** Increased `timeoutSeconds: 10` and `periodSeconds: 30` on the liveness probe. With `failureThreshold: 3`, the pod must fail 3 consecutive probes (90 seconds) before being killed — enough margin for any single query to complete.
+
+---
+
+## 10. Streamlit PermissionError writing to /.streamlit
+
+**Symptom:** Streamlit pod crashes on startup:
+```
+PermissionError: [Errno 13] Permission denied: '/.streamlit'
+```
+
+**Root cause:** Streamlit writes an installation ID and credentials cache to `$HOME/.streamlit/` at startup. With `HOME` unset and running as UID 1000, it falls back to `/` and fails to create `/.streamlit/`.
+
+**Fix:** Added `HOME=/tmp` to the ConfigMap. Streamlit then writes to `/tmp/.streamlit/` which is writable by any user.
