@@ -60,6 +60,15 @@
 
 ---
 
+## Future work
+
+| # | Task | Notes |
+|---|------|-------|
+| F1 | Move portfolio Streamlit to repo root | Currently lives in `p6-research-agent/streamlit/` as it was the first project to have a UI. Should be extracted to `portfolio-ui/` at the repo root with its own image, Helm chart, and CI job — independent of p6. |
+| F2 | Streaming agent responses | Replace `graph.invoke()` with `graph.astream()` + SSE endpoint so tool calls appear in the UI as they happen, not after completion. |
+
+---
+
 ## Quick status
 
 ```
