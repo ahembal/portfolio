@@ -124,3 +124,22 @@ would violate PodSecurity "restricted:latest":
 Running containers as root is a significant attack surface — if the container is compromised, the attacker has root inside the pod and can potentially escape to the node. `capabilities.drop: ALL` and `allowPrivilegeEscalation: false` are baseline hardening required by CIS Kubernetes Benchmark 5.2.x and NIST SP 800-190. The `seccompProfile: RuntimeDefault` enables kernel syscall filtering at no performance cost.
 
 **References:** CIS K8s Benchmark 5.2.3, 5.2.6, 5.2.7 · NIST SP 800-190 §4.4 · ISO 27001:2022 A.8.9
+
+---
+
+## 8. API pod crash — getpwuid() fails for UID 1000
+
+**Symptom:** API pod restarts repeatedly. Logs show:
+```
+KeyError: 'getpwuid(): uid not found: 1000'
+  File ".../torch/_inductor/runtime/cache_dir_utils.py", line 23, in default_cache_dir
+    sanitized_username = re.sub(r'[\\/:*?"<>|]', "_", getpass.getuser())
+```
+
+**Root cause:** LangChain imports torch at startup. PyTorch's inductor cache builder calls `getpass.getuser()` → `pwd.getpwuid(os.getuid())`. The `python:3.10-slim` base image does not have UID 1000 in `/etc/passwd` even though we add the user with `useradd` in our Dockerfile — the UID lookup fails.
+
+**Fix:** Set `TORCHINDUCTOR_CACHE_DIR=/tmp/torchinductor` in the ConfigMap. PyTorch reads this env var before attempting the `getpwuid()` call and bypasses the username resolution entirely.
+
+Also added `TRANSFORMERS_CACHE=/tmp/hf_cache` preemptively — HuggingFace Transformers has the same pattern.
+
+**Note:** This is the same root cause as p1 issue §10. Any Python image running as a non-root UID without a matching `/etc/passwd` entry will hit this if torch or transformers is imported.
