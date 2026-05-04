@@ -99,3 +99,32 @@ disable multiplexing for GitHub entirely:
 Host github.com
     ControlMaster no
 ```
+
+---
+
+## Git push rejected when CI also writes to main
+
+**Symptom:** Local push fails with:
+```
+! [rejected] main -> main (fetch first)
+Updates were rejected because the remote contains work you do not have locally.
+```
+
+**Root cause:** CI pipelines write back to `main` after every build — they update `values.yaml` with the new image SHA. If you push while a CI run is in flight or just finished, your local branch is behind.
+
+**Fix:** Always `git pull --rebase` before pushing:
+```bash
+git add <files>
+git commit -m "..."
+git pull --rebase
+git push
+```
+
+If there are unstaged changes that block the rebase:
+```bash
+git add <unstaged files>
+git commit -m "..."   # or: git stash + pull --rebase + stash pop
+git push
+```
+
+**Prevention:** Run `git pull --rebase` before starting any commit, not just before pushing.

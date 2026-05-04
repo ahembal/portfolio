@@ -1,5 +1,5 @@
 # Implementation Notes — P1 PCam Deployment
-*Last updated: 2026-04-21*
+*Last updated: 2026-05-03*
 
 This document describes how the project was built: structure chosen, problems hit during development, and decisions made along the way. For how the finished product works see `how-it-works.md`.
 
