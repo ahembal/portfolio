@@ -10,10 +10,10 @@ API_URL = os.getenv("PCAM_API_URL", "http://pcam-pcam-inference.pcam.svc.cluster
 
 DEMO_DIR = Path(__file__).parent.parent / "demo"
 SAMPLES = {
-    "Normal 1": "normal_1.png",
-    "Normal 2": "normal_2.png",
-    "Tumour 1": "tumour_1.png",
-    "Tumour 2": "tumour_2.png",
+    "Normal (1)": "normal_1.png",
+    "Normal (2)": "normal_2.png",
+    "Tumour (1)": "tumour_1.png",
+    "Tumour (2)": "tumour_2.png",
 }
 
 st.set_page_config(page_title="PCam Classifier", layout="centered")
