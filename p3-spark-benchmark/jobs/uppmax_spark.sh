@@ -1,5 +1,5 @@
 #!/bin/bash
-#SBATCH --account=UPPMAX-2026-1-11
+#SBATCH --account=uppmax2026-1-11
 #SBATCH --partition=pelle
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
@@ -10,7 +10,6 @@
 #SBATCH --output=%j_spark.out
 #SBATCH --error=%j_spark.err
 #SBATCH --mail-type=END,FAIL
-#SBATCH --mail-user=emre.balsever@scilifelab.se
 
 # =============================================================================
 # SRA Spark benchmark — UPPMAX (Pelle)
