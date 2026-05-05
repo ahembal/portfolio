@@ -125,11 +125,11 @@ jobs:
         # Write the new SHA into values.yaml and commit it back to main.
         # ArgoCD watches this file — when it changes, ArgoCD detects drift
         # and runs `helm upgrade` on the cluster automatically.
-        # Short SHA (7 chars) matches `git log --oneline` format.
+        # Full SHA required — GHCR uses the full digest as the authoritative reference.
         if: github.ref == 'refs/heads/main'
         run: |
           SHORT_SHA="${GITHUB_SHA:0:7}"
-          sed -i "s/^  tag: .*/  tag: \"${SHORT_SHA}\"/" \
+          sed -i "s/^  tag: .*/  tag: \"${GITHUB_SHA}\"/" \
             p1-pcam-deployment/helm/pcam-inference/values.yaml
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
