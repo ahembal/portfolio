@@ -18,7 +18,7 @@
 # Login: pelle.uppmax.uu.se
 #
 # Runs pipeline at 10M and 40M rows with 1, 2, and 4 nodes.
-# Results written to /proj/nbis_support/portfolio/p3/results/
+# Results written to <base>/p3/results/ (derived from script location)
 #
 # Submit:  sbatch jobs/uppmax_spark.sh
 # Monitor: squeue -u $USER
@@ -28,12 +28,18 @@ set -euo pipefail
 
 echo "Job $SLURM_JOB_ID started on $SLURM_NODELIST at $(date)"
 
-module load java/17
-module load spark/3.5.0
+module load Java/17.0.15
 
-# Set PROJECT to your allocation storage directory (see docs/hpc-accounts.md.local)
-: "${PROJECT:?Set PROJECT to your allocation storage directory}"
-CODE=$PROJECT/code/p3-spark-benchmark
+# Derive directories from script location — no manual PROJECT variable needed.
+# Layout: <base>/portfolio/p3-spark-benchmark/jobs/uppmax_spark.sh
+#         <base>/tools/spark-3.5.8-bin-hadoop3/
+SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
+PROJECT=$(cd "$SCRIPT_DIR/../../.." && pwd)   # <base>/portfolio → <base>
+CODE=$PROJECT/portfolio/p3-spark-benchmark
+
+# Spark installed manually — no module available on Pelle (as of 2026-05-05)
+export SPARK_HOME=$PROJECT/tools/spark-3.5.8-bin-hadoop3
+export PATH=$SPARK_HOME/bin:$PATH
 DATA=$PROJECT/p3/data
 RESULTS=$PROJECT/p3/results
 

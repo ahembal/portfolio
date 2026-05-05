@@ -4,7 +4,7 @@ st.set_page_config(page_title="Spark Benchmark", layout="wide")
 st.title("📊 Spark Benchmark")
 st.caption("Pandas vs PySpark vs cuDF (GPU) · NCBI SRA metadata · UPPMAX + Dardel HPC")
 
-st.info("HPC jobs submitted to UPPMAX and Dardel. Results will appear here once collected.")
+st.info("SLURM scripts are ready. HPC jobs pending submission to UPPMAX and Dardel. Results will appear here once collected.")
 
 with st.sidebar:
     st.header("About")
