@@ -29,12 +29,12 @@ echo "Job $SLURM_JOB_ID started on $SLURM_NODELIST at $(date)"
 
 module load Java/17.0.15
 
-# Derive directories from script location — no manual PROJECT variable needed.
-# Layout: <base>/portfolio/p3-spark-benchmark/jobs/uppmax_spark.sh
-#         <base>/tools/spark-3.5.8-bin-hadoop3/
-SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
-PROJECT=$(cd "$SCRIPT_DIR/../../.." && pwd)   # <base>/portfolio → <base>
-CODE=$PROJECT/portfolio/p3-spark-benchmark
+# SLURM_SUBMIT_DIR = directory where sbatch was called from = <base>/portfolio
+# SLURM copies the script to a temp dir before running so dirname "$0" is
+# unreliable — always use SLURM_SUBMIT_DIR instead.
+REPO_DIR=$SLURM_SUBMIT_DIR
+PROJECT=$(cd "$REPO_DIR/.." && pwd)
+CODE=$REPO_DIR/p3-spark-benchmark
 
 # Spark installed manually — no module available on Pelle (as of 2026-05-05)
 export SPARK_HOME=$PROJECT/tools/spark-3.5.8-bin-hadoop3

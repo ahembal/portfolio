@@ -128,3 +128,28 @@ git push
 ```
 
 **Prevention:** Run `git pull --rebase` before starting any commit, not just before pushing.
+
+---
+
+## Git push stuck — SSH multiplexing socket
+
+**Symptom:** `git push` or `git pull` hangs indefinitely with no output. Sometimes preceded by:
+```
+mux_client_request_session: read from master failed: Broken pipe
+ControlSocket ~/.ssh/socket-git@github.com-22 already exists, disabling multiplexing
+```
+
+**Root cause:** SSH multiplexing reuses an existing SSH connection for speed. When the master connection dies (network drop, session timeout, SSH agent restart), the socket file remains on disk. Subsequent git commands try to reuse the dead socket, hang waiting for a response that never comes.
+
+**Fix:**
+```bash
+rm -f ~/.ssh/socket-git@github.com-22
+git push   # or git pull
+```
+
+**If the socket doesn't exist but it's still stuck:** the remote rejected the push because CI pushed first. Pull first then push:
+```bash
+git pull --rebase && git push
+```
+
+**Prevention:** Both issues stem from the same root: always do `git pull --rebase` before pushing, and if a push hangs, kill it (`Ctrl+C`), remove the socket, and retry.
