@@ -75,3 +75,26 @@ file (10 rows, used for the broadcast join step) is always written alongside.
 - `Center` values are not standardised — "ILLUMINA", "Illumina", "illumina"
   all appear. The platform_lookup only covers the top-10 submitters; the rest
   map to `technology=NULL` and are excluded from the window step
+
+## Known data quality issues
+
+### Malformed CSV rows — embedded unescaped quotes (observed 2026-05-05)
+
+**Symptom:** `pandas.errors.ParserError: Error tokenizing data. C error: EOF inside string`
+
+**Root cause:** Some SRA metadata rows contain unescaped quote characters inside
+tab-separated fields (e.g. study titles with quotation marks). The default pandas
+C parser treats these as the start of a quoted multi-line field, reads until it
+finds a matching closing quote, hits EOF, and fails — even with `on_bad_lines="skip"`.
+The skip option only handles rows that are clearly too long or short, not rows where
+the parser enters an open-quote state.
+
+**Fix:** `quoting=3` (`csv.QUOTE_NONE`) disables all quote processing. Since the
+file is tab-separated, quote characters in field values are not meaningful and
+should be treated as plain text. This allows the parser to skip malformed rows
+cleanly.
+
+**General pattern:** For any streaming data source with inconsistent formatting,
+always use `on_bad_lines="skip"` AND `quoting=csv.QUOTE_NONE` (or `quoting=3`)
+together. `on_bad_lines` alone is not sufficient for quote-related parse errors
+with the C engine.

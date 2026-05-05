@@ -1,6 +1,6 @@
 #!/bin/bash
 #SBATCH --account=UPPMAX-2026-1-11
-#SBATCH --partition=node
+#SBATCH --partition=pelle
 #SBATCH --nodes=4
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=20

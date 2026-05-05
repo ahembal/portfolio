@@ -92,6 +92,7 @@ def fetch_sample(n_rows: int, out_dir: Path) -> None:
                 io.StringIO(chunk_data), sep="\t",
                 usecols=USECOLS, dtype=DTYPES,
                 on_bad_lines="skip",
+                quoting=3,  # csv.QUOTE_NONE — SRA has embedded quotes that break the C parser
             )
             df = df[df["Type"] == "RUN"].copy()
             df["Spots"] = pd.to_numeric(df["Spots"], errors="coerce")
