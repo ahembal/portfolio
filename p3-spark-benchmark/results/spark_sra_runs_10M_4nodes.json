@@ -1,0 +1,13 @@
+{
+  "approach": "spark",
+  "scale": "sra_runs_10M",
+  "nodes": 4,
+  "n_input": 10000000,
+  "total_s": 5.749,
+  "throughput_M_rows_per_s": 1.739,
+  "load_s": 2.116,
+  "filter_s": 0.015,
+  "join_s": 0.017,
+  "agg_s": 0.018,
+  "window_s": 3.583
+}

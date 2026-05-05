@@ -27,8 +27,8 @@
 |---|------|--------|------------|
 | 4 | src/pipeline_spark.py | ✅ Done | The broadcast join hint eliminates shuffle for the small platform_lookup table — it is the single highest-impact optimization. Shuffle partitions tuned per node count avoids over-partitioning at low node counts (scheduling overhead) and under-partitioning at high counts (stragglers). |
 | 5 | jobs/uppmax_spark.sh | ✅ Done | Running 10M and 40M rows at 1/2/4 nodes in the same script gives the data for strong scaling curves (fixed problem size, more nodes) and shows the dataset size at which Spark's parallelism advantage over Pandas begins. |
-| 6 | Results at 10M + 40M rows | ⬜ Todo | Submit to UPPMAX, collect timing JSONs. |
-| 7 | Scaling experiment 1→4 nodes | ⬜ Todo | Already built into uppmax_spark.sh — runs automatically at each node count. |
+| 6 | Results at 10M + 40M rows | ✅ Done | UPPMAX Pelle (2026-05-05). Results in results/. Adding more nodes did not help — data fits in one node's memory at this scale. |
+| 7 | Scaling experiment 1→4 nodes | ✅ Done | Run at 1/2/4 nodes for both 10M and 40M. No scaling benefit observed up to 40M rows. |
 
 ### Phase 3 — GPU pipeline on Dardel
 | # | Step | Status | What & Why |
@@ -60,7 +60,7 @@
 
 ```
 Phase 1  [███]  3/3  ✅ Done
-Phase 2  [██░░] 2/4  ← submit to UPPMAX
+Phase 2  [████] 4/4  ✅ Done
 Phase 3  [██░]  2/3  ← submit to Dardel
 Phase 4  [░░░]  0/3  ← after HPC results
 ```

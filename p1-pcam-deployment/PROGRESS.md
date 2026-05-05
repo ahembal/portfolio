@@ -55,6 +55,16 @@
 
 ---
 
+## Future work
+
+| # | Task | Notes |
+|---|------|-------|
+| F1 | Temperature scaling calibration | The model's confidence scores are not calibrated — "100% normal" means a very negative logit, not a true 100% probability. Fit a temperature parameter T on the validation set (`torch.sigmoid(logit / T)`). T is fitted by minimising NLL. Save T to `artifacts/threshold.json` and apply in the serving API before returning confidence. ~30 lines of code. See `docs/model-limitations.md §3`. |
+| F2 | Replace demo patches with real PCam images | Current samples in `streamlit/demo/` are from PathMNIST (colorectal tissue) — out-of-distribution for a breast lymph node model. Use `notebooks/extract_demo_patches.ipynb` on Kaggle to extract real PCam patches and replace them. |
+| F3 | Fix cluster DNS (Step 19) | Update MAAS DHCP to hand out `192.168.1.90` as DNS; unblocks ArgoCD live sync. See `docs/deployment-troubleshooting.md §7`. |
+
+---
+
 ## Files created
 
 | File | Purpose |
