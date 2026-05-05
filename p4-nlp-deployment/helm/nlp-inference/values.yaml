@@ -1,0 +1,19 @@
+namespace: nlp-inference
+
+api:
+  image:
+    repository: ghcr.io/ahembal/nlp-inference-api
+    tag: latest   # replaced by CI with full SHA
+  replicas: 1
+  resources:
+    requests:
+      cpu: "500m"
+      memory: "1Gi"
+    limits:
+      cpu: "2"
+      memory: "2Gi"
+
+rgw:
+  endpoint: "http://192.168.1.200"
+  bucket: "nlp-models"
+  prefix: "pubmed-rct/v1"

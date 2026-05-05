@@ -1,0 +1,6 @@
+apiVersion: v2
+name: nlp-inference
+description: PubMed RCT sentence classifier — DistilBERT served via FastAPI
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

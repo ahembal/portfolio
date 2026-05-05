@@ -11,6 +11,7 @@ data:
   API_URL: "http://research-agent-api:8000"
   PCAM_API_URL: "http://pcam-pcam-inference.pcam.svc.cluster.local"
   METADATA_API_URL: "http://metadata-ingestion-metadata-ingestion-api.metadata.svc.cluster.local"
+  NLP_API_URL: "http://nlp-inference-api.nlp-inference.svc.cluster.local:8000"
   TORCHINDUCTOR_CACHE_DIR: "/tmp/torchinductor"
   TRANSFORMERS_CACHE: "/tmp/hf_cache"
   STREAMLIT_HOME: "/tmp"

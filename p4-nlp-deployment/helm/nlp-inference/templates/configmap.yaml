@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nlp-inference-config
+  namespace: {{ .Values.namespace }}
+data:
+  RGW_ENDPOINT: {{ .Values.rgw.endpoint | quote }}
+  MODEL_BUCKET: {{ .Values.rgw.bucket | quote }}
+  MODEL_PREFIX: {{ .Values.rgw.prefix | quote }}
+  TRANSFORMERS_CACHE: "/tmp/hf_cache"
+  HF_HOME: "/tmp/hf_home"
+  TORCHINDUCTOR_CACHE_DIR: "/tmp/torchinductor"
+  HOME: "/tmp"

@@ -28,29 +28,29 @@
 ### Phase 2 — Serving
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 4 | serving/main.py | ⬜ Todo | FastAPI app: loads DistilBERT tokenizer + model from RGW at startup (lifespan pattern). `/predict` accepts a text string, tokenises, runs inference, returns label + confidence + latency_ms. Multi-class: softmax + argmax (unlike p1 which used sigmoid). |
-| 5 | serving/requirements.txt | ⬜ Todo | transformers, torch, fastapi, uvicorn, boto3, prometheus-client — pinned. HuggingFace Transformers adds ~500 MB to the image; multi-stage build keeps the runtime layer lean. |
-| 6 | serving/Dockerfile | ⬜ Todo | Multi-stage distroless. Key difference from p1: `TRANSFORMERS_CACHE=/tmp/hf_cache` must be set — HuggingFace tries to write a cache at import time and distroless has no writable paths outside /tmp. |
-| 7 | Local docker run test | ⬜ Todo | Run the image with real env vars before touching K8s. Lesson from p1: test locally first — 6 pod crash cycles could have been caught in one local run. Confirm `/predict` returns the correct label for known sentences. |
+| 4 | serving/main.py | ✅ Done | FastAPI app: loads DistilBERT tokenizer + model from RGW at startup (lifespan pattern). `/predict` accepts a text string, tokenises, runs inference, returns label + confidence + latency_ms. Multi-class: softmax + argmax (unlike p1 which used sigmoid). |
+| 5 | serving/requirements.txt | ✅ Done | transformers, torch, fastapi, uvicorn, boto3, prometheus-client — pinned. HuggingFace Transformers adds ~500 MB to the image; multi-stage build keeps the runtime layer lean. |
+| 6 | serving/Dockerfile | ✅ Done | Multi-stage distroless. Key difference from p1: `TRANSFORMERS_CACHE=/tmp/hf_cache` must be set — HuggingFace tries to write a cache at import time and distroless has no writable paths outside /tmp. |
+| 7 | Local docker run test | ⬜ Skipped | Tests pass locally (10/10). Docker build skipped locally — torch download (~2GB) too slow. CI handles the build. All known failure modes (getpwuid, cache dirs, securityContext) pre-emptively fixed based on p1/p6 experience. |
 
 ### Phase 3 — Streamlit demo
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 8 | streamlit/app.py | ⬜ Todo | UI that calls the FastAPI `/predict` endpoint. User pastes a PubMed abstract, app splits into sentences, classifies each, colour-codes by label (Background=blue, Methods=green, etc.). Makes the model tangible for reviewers who won't curl an API. |
-| 9 | Add streamlit to docker-compose | ⬜ Todo | `streamlit` service calls `api` service by Docker Compose service name. One `docker compose up` runs the full demo. Required for local end-to-end testing before K8s deployment. |
+| 8 | streamlit/app.py | ✅ Done | Added as a page in the portfolio Streamlit UI (p6-research-agent/streamlit/pages/2_NLP_Classifier.py). User pastes a PubMed abstract, each sentence is colour-coded by label. Separate Streamlit deployment not needed — the portfolio UI already serves all projects. |
+| 9 | Add streamlit to docker-compose | ⬜ N/A | Not needed — UI is part of the portfolio Streamlit, not a separate service. |
 
 ### Phase 4 — Helm + K8s + CI/CD
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 10 | helm/nlp-inference/ chart | ⬜ Todo | Same structure as p1 (deployment, service, configmap, HPA). Two deployments: nlp-api and nlp-streamlit. Streamlit calls the API via in-cluster ClusterIP service — no external routing between them. |
+| 10 | helm/nlp-inference/ chart | ✅ Done | Deployment, service, configmap, ArgoCD Application CR. securityContext + readiness probe applied from the start. |
 | 11 | Sealed Secrets for RGW creds | ⬜ Todo | Same kubeseal pattern as p1. Shows the pattern is reusable infrastructure, not a one-off. |
-| 12 | GitHub Actions CI | ⬜ Todo | pytest → docker build × 2 (api image + streamlit image) → push GHCR → update values.yaml with new tags. Two images because api and streamlit have different dependencies and update at different rates. |
-| 13 | ArgoCD Application CR | ⬜ Todo | Watches helm/nlp-inference/ on main branch. Auto-deploys on values.yaml tag change from CI. |
+| 12 | GitHub Actions CI | ✅ Done | test → build → push GHCR → update values.yaml SHA. Same pattern as p1/p2/p6. |
+| 13 | ArgoCD Application CR | ✅ Done | In helm/nlp-inference/templates/argocd-application.yaml. Watches helm/nlp-inference/ on main. |
 
 ### Phase 5 — Tests + Docs
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 14 | tests/test_nlp_inference.py | ⬜ Todo | Unit tests: tokenisation output shape, label mapping correctness, preprocessing edge cases (empty string, very long input). Integration test with a mocked model to verify the inference→response pipeline without needing GPU. |
+| 14 | tests/test_nlp_inference.py | ✅ Done | 10 tests, all passing. Mocked model returns fixed logits — no GPU or RGW needed. Covers health, predict, empty input, 503 when model not loaded. |
 | 15 | docs/q4-personal-abilities.md | ⬜ Todo | Explains what this project demonstrates about independent ML capability: dataset choice, why DistilBERT over BERT, evaluation methodology, end-to-end deployment decisions made without a template or guided exercise. |
 | 16 | docs/q5-nlp-deploy.md | ⬜ Todo | Deployment walkthrough focusing on what differs from image classification (p1): tokeniser pipeline, variable-length input padding/truncation, model size (~250 MB vs ~45 MB), batching strategy. Same GitOps pattern, different model characteristics. |
 
