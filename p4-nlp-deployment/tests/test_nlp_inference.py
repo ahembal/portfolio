@@ -4,14 +4,16 @@ All external calls (S3/RGW, model download) are mocked — no network required.
 Model is replaced with a mock that returns fixed logits.
 """
 
-import pytest
 from unittest.mock import MagicMock
+
+import pytest
 from fastapi.testclient import TestClient
 
 
 @pytest.fixture(autouse=True)
 def mock_state(monkeypatch):
     import torch
+
     from serving.main import _state
 
     mock_tokenizer = MagicMock()
@@ -22,7 +24,7 @@ def mock_state(monkeypatch):
 
     mock_model = MagicMock()
     mock_output = MagicMock()
-    mock_output.logits = torch.tensor([[0.1, 0.1, 3.0, 0.1, 0.1]])  # class 2 = METHODS wins
+    mock_output.logits = torch.tensor([[0.1, 0.1, 3.0, 0.1, 0.1]])  # class 2 = METHODS
     mock_model.return_value = mock_output
 
     _state["tokenizer"] = mock_tokenizer
@@ -45,7 +47,7 @@ class TestHealth:
         assert resp.json()["status"] == "ok"
 
     def test_returns_503_when_model_not_loaded(self):
-        from serving.main import app, _state
+        from serving.main import _state, app
         _state.clear()
         c = TestClient(app, raise_server_exceptions=False)
         assert c.get("/health").status_code == 503
@@ -53,7 +55,10 @@ class TestHealth:
 
 class TestPredict:
     def test_returns_sentences_list(self, client):
-        resp = client.post("/predict", json={"text": "Patients received drug A. Results were positive."})
+        resp = client.post(
+            "/predict",
+            json={"text": "Patients received drug A. Results were positive."},
+        )
         assert resp.status_code == 200
         assert len(resp.json()["sentences"]) == 2
 
@@ -65,7 +70,7 @@ class TestPredict:
 
     def test_label_is_valid(self, client):
         from serving.main import ID2LABEL
-        resp = client.post("/predict", json={"text": "The study used a randomised design."})
+        resp = client.post("/predict", json={"text": "The study used a design."})
         assert resp.json()["sentences"][0]["label"] in ID2LABEL.values()
 
     def test_mock_returns_methods(self, client):
@@ -85,7 +90,7 @@ class TestPredict:
         assert resp.json()["latency_ms"] >= 0
 
     def test_returns_503_when_model_not_loaded(self):
-        from serving.main import app, _state
+        from serving.main import _state, app
         _state.clear()
         c = TestClient(app, raise_server_exceptions=False)
         assert c.post("/predict", json={"text": "Some text."}).status_code == 503

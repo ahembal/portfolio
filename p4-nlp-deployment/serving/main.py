@@ -1,5 +1,4 @@
 import asyncio
-import io
 import os
 import time
 from contextlib import asynccontextmanager
@@ -16,7 +15,9 @@ from transformers import DistilBertForSequenceClassification, DistilBertTokenize
 # ---------------------------------------------------------------------------
 # Label mapping — must match training LABEL2ID
 # ---------------------------------------------------------------------------
-ID2LABEL = {0: "BACKGROUND", 1: "OBJECTIVE", 2: "METHODS", 3: "RESULTS", 4: "CONCLUSIONS"}
+ID2LABEL = {
+    0: "BACKGROUND", 1: "OBJECTIVE", 2: "METHODS", 3: "RESULTS", 4: "CONCLUSIONS"
+}
 LABEL_COLOURS = {
     "BACKGROUND":  "#4A90D9",
     "OBJECTIVE":   "#E67E22",
