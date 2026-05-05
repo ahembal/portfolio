@@ -26,6 +26,7 @@ def run_pipeline(data_path: str, lookup_path: str, out_dir: str,
     spark = (SparkSession.builder
              .appName(f"sra-benchmark-{scale}")
              .config("spark.sql.shuffle.partitions", "200")
+             .config("spark.sql.legacy.parquet.nanosAsLong", "true")
              .getOrCreate())
     spark.sparkContext.setLogLevel("WARN")
 
