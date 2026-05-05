@@ -65,6 +65,45 @@ than one on `numpy.random.normal()`.
 
 ---
 
+## What kind of workload is this?
+
+This benchmark covers an **OLAP (Online Analytical Processing)** workload — the
+standard pattern in data engineering and research pipelines:
+
+- Scan large amounts of historical records
+- Filter down to relevant rows
+- Group and aggregate (sum, count, average)
+- Compute trends over time (window functions)
+
+This is distinct from **OLTP (Online Transaction Processing)** which handles
+individual writes like "insert this record" or "update this status". OLTP is
+what your web API database does. OLAP is what your analytics, dashboards,
+and research pipelines do.
+
+| Engine | Designed for | Sweet spot |
+|--------|-------------|-----------|
+| Pandas | General purpose | < 5M rows, single machine |
+| DuckDB | OLAP, single node | 1M – 1B rows, no cluster needed |
+| PySpark | OLAP, distributed | > 100M rows, multi-node, fault tolerance |
+| cuDF | OLAP, GPU | GPU available, vectorisable operations |
+
+---
+
+## Why not DuckDB?
+
+DuckDB is an in-process analytical database that has become the default
+recommendation for OLAP workloads at 1M–1B row scale on a single node.
+It is often 5–10× faster than Pandas and competitive with Spark at medium
+scale — without any cluster setup.
+
+A complete benchmark would include DuckDB as a fourth engine — it would give
+a more honest answer to "when should you reach for Spark vs a simpler tool?".
+It is listed as a future addition in PROGRESS.md. The current three-way
+comparison (Pandas / Spark / cuDF) covers the single-node vs multi-node vs
+GPU axes. DuckDB would add the modern single-node reference point.
+
+---
+
 ## The pipeline — step by step
 
 All three runtimes execute the exact same logical pipeline. The only difference
