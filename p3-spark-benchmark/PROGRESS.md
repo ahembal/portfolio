@@ -52,6 +52,7 @@
 |---|------|-------|
 | F1 | Add DuckDB as a fourth engine | DuckDB is the modern standard for OLAP at 1M–1B row scale on a single node. Adding it gives a more complete answer to "when should you use Spark vs a simpler tool?". 30-line addition to the pipeline. |
 | F2 | Fix dataset reproducibility | NCBI SRA updates daily — pin a fixed snapshot so benchmark results are reproducible. |
+| F3 | Write Parquet with microsecond timestamps | fetch_data.py writes nanosecond timestamps by default; Spark 3.5 doesn't support them natively. Fix: `df["Published"].astype("datetime64[us, UTC]")` before saving. Requires re-fetching data. |
 
 ---
 

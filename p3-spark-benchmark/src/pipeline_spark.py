@@ -33,8 +33,12 @@ def run_pipeline(data_path: str, lookup_path: str, out_dir: str,
     timings = {}
     t = time.perf_counter()
     df = spark.read.parquet(data_path)
+    # nanosAsLong converts TIMESTAMP(NANOS) → BIGINT; convert back to timestamp.
+    # TODO(F3): remove once data is re-fetched with microsecond precision.
+    if dict(df.dtypes).get("Published") == "bigint":
+        df = df.withColumn("Published", (F.col("Published") / 1e9).cast("timestamp"))
     lookup = spark.read.parquet(lookup_path)
-    lookup_bc = F.broadcast(lookup)           # broadcast hint — avoids shuffle
+    lookup_bc = F.broadcast(lookup)
     timings["load_s"] = round(time.perf_counter() - t, 3)
     n_input = df.count()
 

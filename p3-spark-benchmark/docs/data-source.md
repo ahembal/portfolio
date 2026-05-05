@@ -98,3 +98,18 @@ cleanly.
 always use `on_bad_lines="skip"` AND `quoting=csv.QUOTE_NONE` (or `quoting=3`)
 together. `on_bad_lines` alone is not sufficient for quote-related parse errors
 with the C engine.
+
+### Nanosecond timestamps incompatible with Spark 3.5 (observed 2026-05-05)
+
+**Symptom:** `AnalysisException: Illegal Parquet type: INT64 (TIMESTAMP(NANOS,true))`
+
+**Root cause:** Pandas writes timestamps with nanosecond precision by default. Spark 3.5 does not support `TIMESTAMP(NANOS)` natively.
+
+**Current workaround:** `spark.sql.legacy.parquet.nanosAsLong=true` in SparkSession config converts the timestamp to BIGINT (nanoseconds since epoch). A subsequent conversion `(col / 1e9).cast("timestamp")` restores it for use in the pipeline.
+
+**Proper fix (TODO):** Write Parquet files with microsecond precision in `fetch_data.py`:
+```python
+df["Published"] = df["Published"].astype("datetime64[us, UTC]")
+df["Updated"]   = df["Updated"].astype("datetime64[us, UTC]")
+```
+This makes the Parquet files natively compatible with Spark, removes the config hack, and eliminates the in-pipeline conversion. Requires re-fetching the data.
