@@ -13,14 +13,14 @@
 
 # =============================================================================
 # SRA Spark benchmark — UPPMAX (Pelle)
-# Allocation: UPPMAX 2026/1-11 (NBIS support)
-# Login: pelle.uppmax.uu.se
-#
-# Runs pipeline at 10M and 40M rows with 1, 2, and 4 nodes.
-# Results written to <base>/p3/results/ (derived from script location)
-#
-# Submit:  sbatch jobs/uppmax_spark.sh
+# Allocation: uppmax2026-1-11
+# Submit from repo root: sbatch p3-spark-benchmark/jobs/uppmax_spark.sh
 # Monitor: squeue -u $USER
+#
+# How it works:
+# SLURM allocates 4 nodes. We then start a Spark standalone cluster on those
+# nodes using srun (SLURM-native, no SSH needed). The master runs on the first
+# node; workers run on all 4 nodes. spark-submit connects to the master URL.
 # =============================================================================
 
 set -euo pipefail
@@ -29,14 +29,11 @@ echo "Job $SLURM_JOB_ID started on $SLURM_NODELIST at $(date)"
 
 module load Java/17.0.15
 
-# SLURM_SUBMIT_DIR = directory where sbatch was called from = <base>/portfolio
-# SLURM copies the script to a temp dir before running so dirname "$0" is
-# unreliable — always use SLURM_SUBMIT_DIR instead.
+# SLURM_SUBMIT_DIR = directory where sbatch was called (repo root = <base>/portfolio)
 REPO_DIR=$SLURM_SUBMIT_DIR
 PROJECT=$(cd "$REPO_DIR/.." && pwd)
 CODE=$REPO_DIR/p3-spark-benchmark
 
-# Spark installed manually — no module available on Pelle (as of 2026-05-05)
 export SPARK_HOME=$PROJECT/tools/spark-3.5.8-bin-hadoop3
 export PATH=$SPARK_HOME/bin:$PATH
 DATA=$PROJECT/p3/data
@@ -44,30 +41,46 @@ RESULTS=$PROJECT/p3/results
 
 mkdir -p "$RESULTS"
 
+# ---------------------------------------------------------------------------
+# Start Spark standalone cluster using srun (SLURM-native, no SSH required)
+# $SLURM_NODELIST is compact notation — expand with scontrol
+NODES=($(scontrol show hostname "$SLURM_NODELIST"))
+MASTER=${NODES[0]}
+MASTER_URL="spark://$MASTER:7077"
+
+echo "Starting Spark master on $MASTER"
+srun --nodes=1 --ntasks=1 -w "$MASTER" \
+    "$SPARK_HOME/bin/spark-class" org.apache.spark.deploy.master.Master \
+    --host "$MASTER" --port 7077 &
+sleep 10
+
+echo "Starting Spark workers on all nodes"
+for node in "${NODES[@]}"; do
+    srun --nodes=1 --ntasks=1 -w "$node" \
+        "$SPARK_HOME/bin/spark-class" org.apache.spark.deploy.worker.Worker \
+        "$MASTER_URL" &
+done
+sleep 15
+echo "Spark cluster ready at $MASTER_URL"
+
+# ---------------------------------------------------------------------------
 pip install --user -q pyarrow pandas 2>/dev/null
 
-# ---- Run at each scale and node count ----------------------------------------
+# ---- Run at each scale and node count --------------------------------------
 
 for SCALE in 10M 40M; do
     DATA_FILE=$DATA/sra_runs_${SCALE}.parquet
-    if [ ! -f "$DATA_FILE" ]; then
-        echo "Fetching $SCALE data..."
-        python "$CODE/src/fetch_data.py" --sample $SCALE --out "$DATA"
-    fi
 
     for N_NODES in 1 2 4; do
         echo "--- Spark | $SCALE | $N_NODES nodes ---"
-        EXECUTOR_CORES=20
-        EXECUTOR_MEM=48g
-        DRIVER_MEM=16g
 
         spark-submit \
-            --master spark://$SLURM_NODELIST:7077 \
+            --master "$MASTER_URL" \
             --deploy-mode client \
             --num-executors $N_NODES \
-            --executor-cores $EXECUTOR_CORES \
-            --executor-memory $EXECUTOR_MEM \
-            --driver-memory $DRIVER_MEM \
+            --executor-cores 20 \
+            --executor-memory 48g \
+            --driver-memory 16g \
             --conf spark.sql.shuffle.partitions=$((N_NODES * 40)) \
             "$CODE/src/pipeline_spark.py" \
             --data "$DATA_FILE" \
@@ -76,6 +89,11 @@ for SCALE in 10M 40M; do
             --nodes $N_NODES
     done
 done
+
+# ---------------------------------------------------------------------------
+echo "Stopping Spark cluster"
+srun --nodes=1 --ntasks=1 -w "$MASTER" \
+    "$SPARK_HOME/bin/spark-class" org.apache.spark.deploy.master.Master --stop 2>/dev/null || true
 
 echo "All runs complete at $(date)"
 echo "Results in: $RESULTS"
