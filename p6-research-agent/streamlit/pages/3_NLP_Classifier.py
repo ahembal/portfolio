@@ -70,11 +70,11 @@ if st.button("Classify", disabled=not abstract.strip()):
         colour = LABEL_COLOURS.get(s["label"], "#888888")
         st.markdown(
             f'<div style="border-left:4px solid {colour};padding:8px 12px;margin:6px 0;'
-            f'background:#f8f8f8;border-radius:0 4px 4px 0">'
+            f'background:#f8f8f8;border-radius:0 4px 4px 0;color:#111;">'
             f'<span style="background-color:{colour};color:white;padding:1px 6px;'
             f'border-radius:3px;font-size:0.75em;margin-right:8px">{s["label"]}</span>'
-            f'<span style="font-size:0.85em">{s["text"]}</span>'
-            f'<span style="float:right;color:#aaa;font-size:0.75em">{s["confidence"]:.0%}</span>'
+            f'<span style="font-size:0.85em;color:#111">{s["text"]}</span>'
+            f'<span style="float:right;color:#666;font-size:0.75em">{s["confidence"]:.0%}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )
