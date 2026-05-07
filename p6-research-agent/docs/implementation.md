@@ -206,3 +206,66 @@ context.
 **Design decision:** `_build_llm()` is called inside each node rather than
 once at module level. This avoids holding a persistent connection and makes
 the graph easier to test with a mocked LLM.
+
+---
+
+## Post-Phase 2 fixes (2026-05-06)
+
+### src/agent/prompts.py — system prompt revision
+
+**Problem hit:** The original system prompt said "use the minimum number of
+tool calls needed." Llama 3.1 8B interpreted this aggressively — after a
+single `pubmed_search` returning 10 titles, it generated an answer without
+calling `pubmed_fetch`. The answer cited real PMIDs but was based on titles
+only, not actual abstracts.
+
+**Fix:** Rule 2 now explicitly states that `pubmed_search` returns titles only
+and `pubmed_fetch` must be called before citing a paper. Rule 3 was tightened
+to prohibit citing any identifier not retrieved by a tool call.
+
+The original "minimum tool calls" intent is preserved — the fix makes explicit
+what "minimum" means: one search is not enough if you haven't read the content.
+
+### src/tools/pubmed.py — English language filter
+
+**Problem:** PubMed indexes papers from journals worldwide. Non-English
+abstracts were being returned and the LLM could silently produce incorrect
+summaries from them.
+
+**Fix:** The query is wrapped with `AND English[Language]` before passing to
+Entrez: `f"({query}) AND English[Language]"`. This is a standard PubMed
+filter — the same syntax available in the PubMed web UI.
+
+### src/api/main.py — citation provenance validation
+
+**Problem:** The LLM hallucinated `[UniProt:P04641]` in an answer about TP53
+without calling `uniprot_lookup`. P04641 is not the human TP53 accession
+(P04637 is). The identifier was plausible but invented.
+
+**Implementation:**
+After the agent finishes, the API builds a set of retrieved identifiers from
+the tool call history (all PMIDs from `pubmed_search`/`pubmed_fetch`, all
+accessions from `uniprot_lookup`). It then extracts all `[PMID:xxxxx]` and
+`[UniProt:Pxxxxx]` patterns from the answer text using regex, and subtracts
+the retrieved set:
+
+```python
+retrieved_ids = {c.id for c in unique_citations}
+cited_pmids   = set(re.findall(r'\[PMID:(\d+)\]', answer))
+cited_uniprot = set(re.findall(r'\[UniProt:([A-Z0-9]+)\]', answer))
+hallucinated  = (cited_pmids | cited_uniprot) - retrieved_ids
+```
+
+If `hallucinated` is non-empty, a warning is appended to the answer text.
+The response is not blocked — the warning surfaces to the caller who can
+decide how to handle it.
+
+**What this does not catch:** claims that misrepresent a real retrieved paper,
+title-only citations (PMID retrieved via search but abstract never fetched).
+See `docs/answer-quality.md` for the full scope of what is and isn't validated.
+
+### src/api/main.py — duplicate `answer = synth.content` removed
+
+A duplicate line `answer = synth.content` was present after the synthesis
+fallback block. No functional impact (the value was the same) but removed
+for clarity.
