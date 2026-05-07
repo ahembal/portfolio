@@ -128,15 +128,15 @@ local IP `192.168.1.200` is unreachable.
 
 **Change made:**
 ```bash
-echo "alias ssh-quick-thrush-tailscale='ssh -i ~/.ssh/turtle_key ubuntu@100.82.75.34'" >> ~/.bashrc
+echo "alias ssh-quick-thrush-tailscale='ssh -i ~/.ssh/turtle_key ubuntu@<quick-thrush-tailscale-ip>'" >> ~/.bashrc
 ```
 
-**All cluster node aliases:**
+**All cluster node aliases** (Tailscale IPs in `runbooks/hosts.local.md` — not committed):
 
-| Node | Role | Local IP | Tailscale IP | Alias |
-|------|------|----------|--------------|-------|
-| clever-fly | K8s control-plane | 192.168.1.184 | 100.123.23.6 | `ssh-clever-fly-tailscale` |
-| quick-thrush | K8s worker | 192.168.1.200 | 100.82.75.34 | `ssh-quick-thrush-tailscale` |
-| sought-perch | K8s worker | 192.168.1.16 | 100.69.132.9 | `ssh-sought-perch-tailscale` |
-| alert-lizard | Ceph MON/OSD | 192.168.1.183 | 100.119.255.51 | `ssh-alert-lizard-tailscale` |
-| MAAS controller | Infra | 192.168.1.90 | 100.124.69.85 | `ssh-turtle-mgmn-tailscale` |
+| Node | Role | Local IP | Alias |
+|------|------|----------|-------|
+| clever-fly | K8s control-plane | 192.168.1.184 | `ssh-clever-fly-tailscale` |
+| quick-thrush | K8s worker | 192.168.1.200 | `ssh-quick-thrush-tailscale` |
+| sought-perch | K8s worker | 192.168.1.16 | `ssh-sought-perch-tailscale` |
+| alert-lizard | Ceph MON/OSD | 192.168.1.183 | `ssh-alert-lizard-tailscale` |
+| turtle-mgmt | MAAS controller | 192.168.1.90 | `ssh-turtle-mgmt-tailscale` |

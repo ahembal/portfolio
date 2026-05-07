@@ -59,3 +59,5 @@ p1-pcam-deployment/SPEC.md
 p1-pcam-deployment/artifacts/
 TODO.local
 *.local
+runbooks/hosts.local.md
+cluster/inventory/group_vars/secrets.yml

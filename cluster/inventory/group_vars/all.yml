@@ -28,4 +28,4 @@ ansible_python_interpreter: /usr/bin/python3
 cluster_name: homelab
 control_plane_ip: "192.168.1.184"  # clever-fly
 control_plane_endpoint: "192.168.1.184:6443"
-tailscale_ip: "100.123.23.6"       # added to API server cert SANs (Step 17)
+tailscale_ip: "{{ clever_fly_tailscale_ip }}"  # added to API server cert SANs (Step 17) — actual IP in hosts.local.md
