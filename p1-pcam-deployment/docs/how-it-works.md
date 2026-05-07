@@ -38,6 +38,16 @@ The model classifies 96×96 pixel histopathology patches from the PatchCamelyon
 The model is ResNet-18 fine-tuned on PCam. It outputs a single probability
 (P(tumour)) via sigmoid activation. If P(tumour) ≥ 0.5, the label is `tumour`.
 
+**Why one output and sigmoid, not two outputs and softmax:**
+For binary classification, softmax over two outputs is redundant —
+`P(normal) = 1 - P(tumour)` always. The second output carries no additional
+information. A single logit + sigmoid is the standard choice for binary tasks:
+it uses fewer parameters, pairs naturally with `BCEWithLogitsLoss`, and allows
+threshold tuning (e.g. setting the decision boundary at 0.37 for higher
+sensitivity). Softmax becomes necessary with 3+ classes where probabilities
+are not derivable from each other — which is why p4 (5-class sentence
+classification) uses softmax.
+
 ---
 
 ## How the model gets into the container

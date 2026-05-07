@@ -103,7 +103,7 @@ class TestPredictEndpoint:
         assert body["latency_ms"] >= 0.0
 
     def test_mock_model_predicts_normal(self, client):
-        """With logits [2.0, 0.5], softmax gives class 0 (normal)."""
+        """Mock returns logit -2.0 → sigmoid(-2.0)=0.12 → P(tumour)<0.5 → label normal."""
         resp = client.post(
             "/predict",
             files={"file": ("patch.jpg", _make_jpeg_bytes(), "image/jpeg")},
