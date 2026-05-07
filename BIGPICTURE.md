@@ -1,8 +1,8 @@
 # Portfolio — Big Picture
 *Last updated: 2026-05-04*
 
-A set of six projects that together demonstrate end-to-end ML engineering:
-training, serving, data pipelines, scale, and agents. Each project is
+A set of seven projects that together demonstrate end-to-end ML engineering:
+training, serving, data pipelines, scale, agents, and evaluation. Each project is
 independent but they share the same infrastructure and engineering patterns.
 
 ---
@@ -17,6 +17,7 @@ independent but they share the same infrastructure and engineering patterns.
 | p4 | [NLP Deployment](p4-nlp-deployment/) | Fine-tune DistilBERT → serve text classification | 🔄 Model trained, serving in progress |
 | p5 | [Dev Practices Site](p5-devpractices-site/) | Cross-project patterns: CI/CD, testing, security, observability | 🔄 Content ready, site not built |
 | p6 | [Research Agent](p6-research-agent/) | LangGraph agent with PubMed + UniProt + RAG | ✅ Live |
+| p7 | [RAG Evaluation](p7-rag-evaluation/) | Hybrid search, reranking, adaptive retrieval, LLM-as-judge evaluation | 🔄 In progress |
 
 ---
 

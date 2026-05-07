@@ -7,6 +7,20 @@ what's missing, why it matters in production, and effort to fix.
 
 ---
 
+## ML Quality (p6 Research Agent)
+
+| Gap | Why it matters in production | Effort |
+|-----|------------------------------|--------|
+| LLM stops after single tool call | Agent answers from paper titles only — claims are not grounded in actual abstract content. Fix: update system prompt to require `pubmed_fetch` before citing. | Low |
+| Hallucinated citations | LLM generates PMID/UniProt accessions from memory without retrieving them. Provenance check is implemented but not yet deployed. | Low |
+| No faithfulness scoring | Validation checks provenance (was the identifier retrieved?) but not faithfulness (does the claim match what was retrieved?). Requires LLM-as-judge pipeline — planned for p7. | High |
+| Title-only grounding not blocked | A PMID can be cited after `pubmed_search` without `pubmed_fetch`. The abstract was never read. Warning is surfaced but answer is not blocked. | Medium |
+| p6: non-English PubMed results | Results may include non-English abstracts. The LLM may silently produce an incorrect summary. Fix: add `AND English[Language]` to Entrez query. | Low |
+
+See `p6-research-agent/docs/answer-quality.md` for full details.
+
+---
+
 ## Security
 
 | Gap | Why it matters in production | Effort |
@@ -44,6 +58,7 @@ what's missing, why it matters in production, and effort to fix.
 | Single replica for all services | All deployments run 1 replica. Production requires at minimum 2 for zero-downtime rolling updates. | Low |
 | No readiness probe on p6 API | The liveness probe exists but no readiness probe — K8s may route traffic before the graph is initialised. | Low |
 | Ollama model not pre-pulled | On pod restart the model must be re-pulled from the internet (~4 GB). A warm PVC helps but doesn't survive PVC deletion. | Low |
+| p6: non-English PubMed results | `pubmed_search()` returns papers in any language. The LLM may silently produce an incorrect summary of a non-English abstract. Fix: add `AND English[Language]` to the Entrez query. | Low |
 
 ---
 
