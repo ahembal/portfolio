@@ -166,7 +166,7 @@ pubmed_search(query="TP53 glioblastoma mutations 2023", max_results=5)
 - Returns titles and PMIDs only — not full abstracts. The agent must call
   `pubmed_fetch` to get the content.
 - Results are sorted by relevance (NCBI's ranking) — not by date or citation count.
-- Non-English papers are included and may be returned.
+- PubMed indexes papers from journals worldwide. Results may include non-English abstracts — the LLM has no language filter and may silently produce an incorrect summary if the fetched abstract is not in English.
 
 ---
 

@@ -66,6 +66,9 @@
 |---|------|-------|
 | F1 | Move portfolio Streamlit to repo root | Currently lives in `p6-research-agent/streamlit/` as it was the first project to have a UI. Should be extracted to `portfolio-ui/` at the repo root with its own image, Helm chart, and CI job — independent of p6. |
 | F2 | Streaming agent responses | Replace `graph.invoke()` with `graph.astream()` + SSE endpoint so tool calls appear in the UI as they happen, not after completion. |
+| F3 | Filter PubMed results to English only | Add `AND English[Language]` to the Entrez query in `pubmed_search()`. Currently non-English papers can be returned — the LLM may silently produce a wrong summary of a non-English abstract. Simple one-line fix but changes behaviour so kept as explicit decision. |
+| F4 | Fix system prompt — require pubmed_fetch before citing | Current prompt says "use minimum tool calls" which causes the LLM to answer from titles only. Update to explicitly require `pubmed_fetch` on top results before citing. See `docs/q-agent-design.md` — Prompt engineering section. |
+| F5 | Implement citation provenance validation | Cross-reference PMIDs and UniProt accessions in the answer against the tool call history. Flag any citation that was not actually retrieved in the session. See `docs/answer-quality.md`. |
 
 ---
 

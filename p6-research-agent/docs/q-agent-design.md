@@ -94,3 +94,49 @@ If the knowledge sources were a private, unstructured document store, citations 
 | RAG corpus quality | Poor retrieval if the corpus was not seeded with relevant documents |
 | No session memory | Each query starts fresh — no follow-up questions in v1 |
 | Non-deterministic | Same question may produce different tool call order |
+
+---
+
+## Prompt engineering for tool-calling
+
+### The problem: LLM stops too early
+
+Llama 3.1 8B with tool-calling tends to stop after a single tool call. The
+original system prompt included "use the minimum number of tool calls needed"
+— the LLM interprets this aggressively, stopping as soon as it has any result
+to work with, even if that result is only paper titles rather than content.
+
+Observed behaviour:
+- `pubmed_search` returns 10 paper titles
+- LLM decides it has "enough" and generates an answer from titles only
+- No `pubmed_fetch` is called — abstracts are never read
+- Citations in the answer are real PMIDs but the LLM is summarising from titles,
+  not from content — factual claims can be wrong
+
+### The fix: explicit tool-use instructions
+
+The system prompt must be explicit about the difference between `pubmed_search`
+(returns titles only) and `pubmed_fetch` (returns full abstract). The LLM needs
+to understand that a title is not a source — it is a pointer to a source.
+
+Updated rule in the system prompt:
+> `pubmed_search` returns titles and PMIDs only — not content. Always call
+> `pubmed_fetch` on at least the top 2-3 results before citing a paper.
+> A citation without a fetched abstract is not grounded.
+
+### Why prompt quality is a design decision, not a tuning knob
+
+The system prompt is the primary control surface for agent behaviour. A vague
+instruction ("use minimum tool calls") produces vague behaviour. A specific
+instruction ("fetch before citing") produces specific behaviour.
+
+The tradeoff: more tool calls mean higher latency. For a research assistant,
+an answer grounded in actual content is worth the extra 10-20 seconds. The
+prompt should reflect this — accuracy over speed for this use case.
+
+### Testing prompt changes
+
+Prompt changes must be tested against the fixed benchmark questions in
+`tests/test_agent.py` (e2e tests). A change that improves tool coverage on
+one question may cause the agent to loop excessively on another. The benchmark
+is the regression test for prompt quality.
