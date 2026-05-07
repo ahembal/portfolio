@@ -69,3 +69,32 @@ If the worker crashes mid-task, the task is lost. `task_acks_late=True` keeps
 the message in Redis until the task finishes, enabling automatic re-queuing on
 worker failure. `worker_prefetch_multiplier=1` ensures tasks are distributed
 evenly across worker replicas under HPA scale-out.
+
+## File bytes passed through Redis (current limitation)
+
+**Current bis.
+
+**Why this works for the demo**: Files in the demo are small. Redis handles
+the message without issue. The pipeline is functionally correct.
+
+**Why this does not scale**: Redis has a default 512 MB message size limit.
+More importantly, large files or concurrent uploads cause the API to hold
+multiple files in RAM simultaneously — the API becomes the bottleneck.
+
+**Production pattern (second iteration):**
+```
+Current:
+  POST /ingest → read bytes into API memory
+              → pass bytes through Redis
+              → worker processes bytes
+
+Better:
+  POST /ingest → upload directly to RGW staging/ prefix
+              → queue only {job_id, s3_staging_key}   ← small message
+              → worker reads from RGW, processes, moves to uploads/ prefix
+              → worker deletes staging object
+```
+
+This decouples file transfer (API → RGW) from processing (worker). The API
+never holds file data in memory beyond the upload stream. Redis messages stay
+small regardless of file size. Documented in `PRODUCTION-READINESS.md`.

@@ -90,6 +90,39 @@ on the ones below it.
 
 ---
 
+## Monorepo test organisation
+
+The portfolio is a monorepo — six independent projects in one repository.
+Each project has its own `pyproject.toml`, virtual environment, and test suite.
+
+**Industry standard pattern:**
+Each project is a self-contained unit. Tests run from within the project
+directory, not from the repo root. This is the same convention used by
+Python monorepo tools (`uv workspaces`, `poetry workspaces`, `tox`) and
+JavaScript equivalents (`npm workspaces`, `turborepo`).
+
+The benefit: each project's `pyproject.toml` configures its own `pythonpath`,
+test discovery rules, and linting settings independently. A change to p4's
+test config cannot break p1's tests.
+
+**Why not a single root `pytest.ini`:**
+With 6 projects, each importing from different locations and requiring
+different PYTHONPATH entries, a single root config would need to aggregate
+all paths — coupling unrelated projects. The per-project approach keeps each
+project independently runnable and testable, which is the right boundary for
+a monorepo where projects could theoretically be extracted into separate repos.
+
+**The practical rule:** always run tests from within the project directory:
+```bash
+cd p1-pcam-deployment && pytest
+cd p6-research-agent && pytest -m "not e2e"
+```
+
+Not from repo root. This is intentional — it mirrors how CI runs tests
+(`working-directory: p1-pcam-deployment` in GitHub Actions).
+
+---
+
 ## What the site does NOT do
 
 - It does not explain the projects in detail — each project has its own docs
