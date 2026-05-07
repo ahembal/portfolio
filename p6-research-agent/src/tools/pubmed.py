@@ -55,7 +55,10 @@ def search(query: str, max_results: int = 5) -> list[dict]:
     """
     _configure()
     try:
-        handle = Entrez.esearch(db="pubmed", term=query, retmax=max_results)
+        # Restrict to English-language papers — non-English abstracts cause
+        # the LLM to silently produce incorrect summaries.
+        english_query = f"({query}) AND English[Language]"
+        handle = Entrez.esearch(db="pubmed", term=english_query, retmax=max_results)
         record = Entrez.read(handle)
         handle.close()
         time.sleep(REQUEST_DELAY)

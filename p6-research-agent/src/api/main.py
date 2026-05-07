@@ -94,7 +94,6 @@ async def query(req: QueryRequest):
             None, lambda: llm.invoke([HM(content=synth_prompt)])
         )
         answer = synth.content
-        answer = synth.content
 
     # Extract citations and steps from tool messages
     citations: list[Citation] = []
@@ -154,6 +153,20 @@ async def query(req: QueryRequest):
         if c.id not in seen:
             seen.add(c.id)
             unique_citations.append(c)
+
+    # Citation provenance check — flag identifiers in the answer that were
+    # never retrieved by a tool call. These are hallucinated citations.
+    import re
+    retrieved_ids = {c.id for c in unique_citations}
+    cited_pmids = set(re.findall(r'\[PMID:(\d+)\]', answer))
+    cited_uniprot = set(re.findall(r'\[UniProt:([A-Z0-9]+)\]', answer))
+    hallucinated = (cited_pmids | cited_uniprot) - retrieved_ids
+    if hallucinated:
+        answer += (
+            f"\n\n⚠️ Provenance warning: the following identifiers appear in "
+            f"the answer but were not retrieved by any tool call — they may be "
+            f"hallucinated: {', '.join(sorted(hallucinated))}"
+        )
 
     return QueryResponse(
         answer=answer,
