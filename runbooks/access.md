@@ -57,3 +57,18 @@ kubectl config use-context emre@homelab-tailscale
 ```
 
 **Note:** `emre@homelab-tailscale` uses `insecure-skip-tls-verify` — Tailscale IP not yet added to API server cert SANs (see known-issues.md).
+
+---
+
+## GitHub / git push
+
+SSH config uses multiplexing (`ControlMaster`). If `git push` hangs or authenticates
+as the wrong user (e.g. `aut-mujx` instead of `ahembal`), a stale master socket is
+the cause. Fix:
+
+```bash
+ssh -O exit git@github.com   # kill the stale master socket
+git push                      # retries with a fresh connection
+```
+
+The socket files live in `~/.ssh/` — look for entries matching `github.com`.
