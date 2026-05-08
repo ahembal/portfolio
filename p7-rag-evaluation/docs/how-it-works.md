@@ -29,17 +29,22 @@ exactly. The score is higher when:
 - The document is short (a term appearing 3 times in a 50-word abstract is more
   relevant than the same term in a 5000-word review)
 
-```
-Query: "BRCA1 mutation breast cancer"
-
-Corpus:
-  doc_A: "BRCA1 mutation increases breast cancer risk significantly"  → high score
-  doc_B: "Breast cancer treatment with chemotherapy"                  → medium (2 terms)
-  doc_C: "DNA damage repair mechanisms in tumour suppression"         → low (0 exact terms)
+**Input:**
+```python
+bm25.search("BRCA1 mutation breast cancer", k=3)
 ```
 
-**Weakness:** doc_C may be highly relevant (BRCA1 is a DNA repair gene) but
-scores zero because the exact words don't appear.
+**Output:**
+```python
+[
+  {"text": "BRCA1 mutation increases breast cancer risk...", "source": "pubmed:123", "score": 4.21, "rank": 1},
+  {"text": "Breast cancer treatment with chemotherapy...",   "source": "pubmed:456", "score": 2.10, "rank": 2},
+  {"text": "DNA damage repair in tumour suppression...",     "source": "pubmed:789", "score": 0.0,  "rank": 3},
+]
+```
+
+**Weakness:** the DNA repair doc scores 0 even though BRCA1 is a DNA repair gene
+— the exact words don't appear. Dense search fills this gap.
 
 ---
 
@@ -49,84 +54,111 @@ A sentence-transformer encodes the query and each document chunk into a
 high-dimensional vector. Chunks whose meaning is close to the query have vectors
 close in that space.
 
+**Input:**
+```python
+vector_store.search("BRCA1 breast cancer DNA repair", k=3)
 ```
-Query embedding:    [0.12, -0.34, 0.87, ...]
-doc_A embedding:    [0.11, -0.31, 0.85, ...]  ← close → high similarity
-doc_C embedding:    [0.09, -0.28, 0.79, ...]  ← also close (DNA repair ≈ BRCA1)
-doc_D embedding:    [0.91,  0.44, -0.12, ...]  ← far → low similarity
+
+**Output:**
+```python
+[
+  {"text": "DNA damage repair in tumour suppression...", "source": "pubmed:789", "score": 0.91, "rank": 1},
+  {"text": "BRCA1 mutation increases breast cancer...",  "source": "pubmed:123", "score": 0.87, "rank": 2},
+  {"text": "Breast cancer treatment with chemo...",      "source": "pubmed:456", "score": 0.74, "rank": 3},
+]
 ```
 
 **Weakness:** exact identifiers like `P04637` may not be close to anything in
-the training data. The model has never seen that accession number used in
-meaningful context.
+the embedding space. The model has never seen that accession in meaningful context.
 
 ---
 
 ## Hybrid search — combining both
 
 Each method produces an independent ranked list. RRF (Reciprocal Rank Fusion)
-merges them:
+merges them into one:
 
 ```
 Query: "BRCA1 breast cancer DNA repair"
 
 BM25 ranking:          Dense ranking:
-1. doc_A               1. doc_C   ← semantic match (DNA repair)
-2. doc_B               2. doc_A   ← also a semantic match
-3. doc_E               3. doc_B
+1. pubmed:123          1. pubmed:789   ← semantic match (DNA repair)
+2. pubmed:456          2. pubmed:123   ← also a semantic match
+3. pubmed:789          3. pubmed:456
 
 RRF score = Σ  1 / (k + rank)   where k=60 (standard constant)
 
-doc_A:  1/(60+1) + 1/(60+2)  = 0.0164 + 0.0161 = 0.0325  ← ranked 1st
-doc_C:  0        + 1/(60+1)  = 0      + 0.0164 = 0.0164  ← ranked 2nd
-doc_B:  1/(60+2) + 1/(60+3)  = 0.0161 + 0.0159 = 0.0320  ← ranked 3rd
+pubmed:123:  1/(60+1) + 1/(60+2)  = 0.0164 + 0.0161 = 0.0325  ← ranked 1st
+pubmed:789:  1/(60+3) + 1/(60+1)  = 0.0159 + 0.0164 = 0.0323  ← ranked 2nd
+pubmed:456:  1/(60+2) + 1/(60+3)  = 0.0161 + 0.0159 = 0.0320  ← ranked 3rd
 ```
 
-A document ranked high in both lists gets the strongest combined score.
-RRF requires no tuning — the k=60 constant works well across domains.
+**Input:**
+```python
+fused = rrf.fuse(bm25_results, dense_results)
+```
+
+**Output:**
+```python
+[
+  {"text": "BRCA1 mutation increases breast cancer...", "source": "pubmed:123", "rrf_score": 0.0325},
+  {"text": "DNA damage repair in tumour suppression..","source": "pubmed:789", "rrf_score": 0.0323},
+  {"text": "Breast cancer treatment with chemo...",    "source": "pubmed:456", "rrf_score": 0.0320},
+]
+```
 
 ---
 
 ## Cross-encoder reranking
 
-BM25 and dense search both use independent encodings — the query and document
-are embedded separately and compared. This is fast but imprecise.
-
-A cross-encoder reads the query and document *together* as one input, which
-lets it model the interaction between them directly:
+BM25 and dense search embed the query and document separately. A cross-encoder
+reads them *together*, which lets it model their interaction directly:
 
 ```
-Input:  [query] SEP [document chunk]
-Output: relevance score 0–1
+Input:  "BRCA1 breast cancer" [SEP] "BRCA1 mutation increases breast cancer risk..."
+Output: 9.4   ← raw relevance logit (higher = more relevant)
+
+Input:  "BRCA1 breast cancer" [SEP] "Breast cancer treatment with chemotherapy..."
+Output: 2.1
 ```
 
-This is more accurate but slow — running a cross-encoder on 10,000 chunks
-for every query would take minutes. The solution is a two-stage pipeline:
+Applied only to the top-20 candidates from hybrid search — never the full corpus.
 
+**Input:**
+```python
+rerank("BRCA1 breast cancer", fused_results, top_n=5)
+```
+
+**Output:**
+```python
+[
+  {"text": "BRCA1 mutation increases breast cancer...", "source": "pubmed:123", "rrf_score": 0.0325, "rerank_score": 9.4},
+  {"text": "DNA damage repair in tumour suppression..","source": "pubmed:789", "rrf_score": 0.0323, "rerank_score": 7.1},
+  ...
+]
+```
+
+**Two-stage pipeline:**
 ```
 Full corpus (thousands of chunks)
         │
         ▼
-  Hybrid search (BM25 + dense + RRF)
-        │  fast, retrieves top-20 candidates
+  Hybrid search (BM25 + dense + RRF)   ← fast, retrieves top-20
+        │
         ▼
-  Cross-encoder reranker
-        │  slow but accurate, scores top-20
+  Cross-encoder reranker               ← accurate, scores top-20
+        │
         ▼
   Top-5 results passed to LLM
 ```
-
-The reranker only ever sees 20 candidates — fast enough for real-time use.
 
 ---
 
 ## Adaptive retrieval
 
-Not all queries need the full pipeline. A factual single-hop question
-("What gene encodes p53?") has one answer that dense search finds instantly.
-Routing it through hybrid search + reranking adds latency with no quality gain.
-
-A query complexity classifier routes queries before retrieval starts:
+Not all queries need the full pipeline. A factual single-hop question has one
+answer dense search finds instantly — routing it through hybrid + reranking
+adds latency with no quality gain.
 
 ```
 Query
@@ -136,59 +168,87 @@ Query
 │  Complexity classifier   │
 │                          │
 │  simple  → fast path     │──► vector search only        < 2s
-│  complex → slow path     │──► hybrid + rerank + agent  30–60s
+│  complex → slow path     │──► hybrid + rerank           30–60s
 └─────────────────────────┘
 ```
 
-**Simple queries** (fast path):
-- Single factual question
-- Named entity lookup ("what is EGFR?")
-- One expected answer
+**Input / output:**
+```python
+retrieve("What is EGFR?")
+# → {"results": [...], "path": "fast", "query": "What is EGFR?"}
 
-**Complex queries** (slow path):
-- Comparative ("compare BRCA1 and BRCA2 roles in DNA repair")
-- Multi-hop ("which proteins interact with TP53 and are implicated in GBM?")
-- Mechanistic ("how does p53 regulate apoptosis?")
+retrieve("How does EGFR signalling interact with mTOR in lung cancer?")
+# → {"results": [...], "path": "slow", "query": "..."}
+```
+
+**Simple queries** (fast path): factual lookups, named entity questions, single expected answer.
+
+**Complex queries** (slow path): comparative, mechanistic, multi-hop, multi-entity.
 
 ---
 
 ## LLM-as-judge evaluation
 
-Evaluating RAG without labelled data uses an LLM to score three properties
-of each query-retrieval-answer triple:
+The judge LLM is called three times per query — once per metric. Each call
+receives a structured prompt and must return a JSON object.
+
+**Context relevance** — are the retrieved chunks relevant to the question?
 
 ```
-Query ──────────────────────────────────────────────────────┐
-                                                            │
-Retrieved chunks ───────────────────────────────────────┐  │
-                                                         │  │
-Generated answer ────────────────────────────────────┐  │  │
-                                                      │  │  │
-                                                      ▼  ▼  ▼
-                                               ┌─────────────────┐
-                                               │   LLM judge      │
-                                               │                  │
-                                               │ Context          │
-                                               │ relevance ───────► 0–1
-                                               │                  │
-                                               │ Faithfulness ────► 0–1
-                                               │                  │
-                                               │ Answer           │
-                                               │ relevance ───────► 0–1
-                                               └─────────────────┘
+Prompt:  "How many of the 3 passages are relevant to: 'How does TP53 regulate apoptosis?'"
+         [passage 1] ... [passage 2] ... [passage 3] ...
+         Reply with only: {"relevant": <int>, "total": 3}
+
+Response: {"relevant": 2, "total": 3}
+Score:    2/3 = 0.667
 ```
 
-| Metric | Question asked to the judge |
-|--------|-----------------------------|
-| Context relevance | Are the retrieved chunks relevant to the query? |
-| Faithfulness | Does the answer contain only claims supported by the chunks? |
-| Answer relevance | Does the answer address what was asked? |
+**Faithfulness** — does the answer contain only claims from the chunks?
 
-Scores are computed per query and aggregated across the benchmark to produce
-system-level metrics. Running the same benchmark before and after a retrieval
-change shows whether quality improved.
+```
+Prompt:  "List each factual claim in the answer. Is each supported by the passages?"
+         Answer: "TP53 activates BAX to trigger apoptosis."
+         Reply with only: {"supported": <int>, "total": <int>}
 
-**Limitation:** the judge LLM can be wrong. A faithfulness score of 0.85 means
-the judge thinks 85% of claims are grounded — not that they actually are.
+Response: {"supported": 1, "total": 1}
+Score:    1/1 = 1.0
+```
+
+**Answer relevance** — does the answer address what was asked?
+
+```
+Prompt:  "Score 0.0–1.0 how well this answer addresses the question."
+         Question: "How does TP53 regulate apoptosis?"
+         Answer: "TP53 activates pro-apoptotic genes such as BAX..."
+         Reply with only: {"score": <float>}
+
+Response: {"score": 0.9}
+Score:    0.9
+```
+
+**Full evaluation output:**
+```python
+evaluate(query, chunks, answer, llm)
+# →
+{
+  "context_relevance": 0.667,
+  "faithfulness":      1.0,
+  "answer_relevance":  0.9,
+}
+```
+
+**Aggregate across benchmark:**
+```python
+{
+  "context_relevance": 0.71,
+  "faithfulness":      0.84,
+  "answer_relevance":  0.78,
+  "n_queries":         20,
+  "fast_path_pct":     45.0,
+}
+```
+
+**Limitation:** the judge LLM can be wrong. A faithfulness score of 0.84 means
+the judge thinks 84% of claims are grounded — not that they actually are.
 This is a signal, not ground truth. See `docs/evaluation-design.md` for a full
 discussion of what automated evaluation can and cannot measure.
