@@ -54,7 +54,7 @@ model:
   bucket: "pcam-models"
   # Key path inside the bucket. Override at deploy time to switch model
   # versions without changing any other config.
-  key: "pcam/kaggle-001/best_model.pt"
+  key: "pcam/tiatoolbox-v1/model.safetensors"
 
 # ---------------------------------------------------------------------------
 # Secret reference — credentials are stored in a K8s Secret, not here

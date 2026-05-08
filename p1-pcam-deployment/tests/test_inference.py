@@ -31,12 +31,12 @@ def _make_jpeg_bytes(width: int = 96, height: int = 96) -> bytes:
 
 
 def _make_mock_model():
-    """Return a mock nn.Module whose forward() outputs a single logit."""
+    """Return a mock nn.Module whose forward() outputs 2-class logits."""
     import torch
     mock = MagicMock()
-    # Model uses num_classes=1 — outputs one raw logit per image.
-    # sigmoid(-2.0) = 0.12 → P(tumour) < 0.5 → label "normal".
-    mock.return_value = torch.tensor([[-2.0]])
+    # TIAToolbox model: 2-class softmax. [2.0, -2.0] → softmax → ~[0.98, 0.02]
+    # → prob_tumour = 0.02 → label "normal".
+    mock.return_value = torch.tensor([[2.0, -2.0]])
     return mock
 
 
@@ -60,10 +60,14 @@ def client():
     import torch
 
     from serving.main import app, app_state
+    from torchvision import transforms
     app_state["model"]     = mock_model
     app_state["device"]    = torch.device("cpu")
     app_state["cfg"]       = MagicMock()
-    app_state["threshold"] = 0.3694
+    app_state["transform"] = transforms.Compose([
+        transforms.Resize((96, 96)),
+        transforms.ToTensor(),
+    ])
 
     yield TestClient(app, raise_server_exceptions=True)
 
@@ -134,9 +138,16 @@ class TestPredictEndpoint:
 class TestPreprocessing:
     def test_output_shape(self):
         """preprocess() should return a (1, 3, 96, 96) tensor."""
-        from serving.main import preprocess
+        import torch
+        from torchvision import transforms
+        from serving.main import preprocess, app_state
+        app_state["transform"] = transforms.Compose([
+            transforms.Resize((96, 96)),
+            transforms.ToTensor(),
+        ])
         tensor = preprocess(_make_jpeg_bytes())
         assert tensor.shape == (1, 3, 96, 96)
+        app_state.clear()
 
     def test_invalid_bytes_raises_value_error(self):
         """preprocess() should raise ValueError on non-image input."""

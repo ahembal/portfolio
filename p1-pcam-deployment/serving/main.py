@@ -40,6 +40,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+import timm
 import torch
 import torch.nn as nn
 from fastapi import FastAPI, File, HTTPException, UploadFile
@@ -53,7 +54,6 @@ from prometheus_client import (
     Info,
     generate_latest,
 )
-from torchvision import models, transforms
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "infra" / "ceph-rgw"))
 from boto3_config import RGWConfig, get_s3_client
@@ -168,28 +168,12 @@ class ServingConfig:
 # Model
 # ---------------------------------------------------------------------------
 
-def build_model(num_classes: int = 1) -> nn.Module:
-    """Build ResNet-18 with the same architecture used during training."""
-    model    = models.resnet18(weights=None)
-    model.fc = nn.Linear(model.fc.in_features, num_classes)
-    return model
-
-
 def load_model(cfg: ServingConfig) -> nn.Module:
     """
-    Download model weights from Ceph RGW and load into ResNet-18.
+    Download model weights from Ceph RGW and load via timm.
 
-    Downloads to cfg.model_path (default: /tmp/best_model.pt) to avoid
-    writing to the container filesystem outside /tmp.
-
-    Args:
-        cfg: ServingConfig (injected)
-
-    Returns:
-        nn.Module: model in eval mode, moved to cfg.resolved_device
-
-    Raises:
-        RuntimeError: if download or weight loading fails
+    Uses TIAToolbox ResNet-18 architecture (2-class softmax, class 1 = tumour).
+    Weights are stored in RGW as model.safetensors.
     """
     log.info(f"Downloading model from s3://{cfg.bucket}/{cfg.model_key}")
     rgw_cfg = RGWConfig(
@@ -207,9 +191,11 @@ def load_model(cfg: ServingConfig) -> nn.Module:
         )
 
     device = cfg.resolved_device
-    model  = build_model()
-    model.load_state_dict(
-        torch.load(cfg.model_path, map_location=device)
+    model  = timm.create_model(
+        "resnet18",
+        pretrained=False,
+        num_classes=2,
+        checkpoint_path=cfg.model_path,
     )
     model.to(device)
     model.eval()
@@ -217,58 +203,16 @@ def load_model(cfg: ServingConfig) -> nn.Module:
     return model
 
 
-def load_threshold(cfg: ServingConfig) -> float:
-    """
-    Download threshold.json from RGW and return the Youden threshold.
-
-    Falls back to 0.5 if the file cannot be downloaded or parsed, so the
-    service still starts even if threshold.json is missing.
-    """
-    threshold_key = cfg.model_key.rsplit("/", 1)[0] + "/threshold.json"
-    log.info(f"Downloading threshold from s3://{cfg.bucket}/{threshold_key}")
-    rgw_cfg = RGWConfig(
-        endpoint=cfg.rgw_endpoint,
-        access_key=cfg.rgw_access_key,
-        secret_key=cfg.rgw_secret_key,
-    )
-    s3 = get_s3_client(rgw_cfg)
-    try:
-        s3.download_file(cfg.bucket, threshold_key, cfg.threshold_path)
-        with open(cfg.threshold_path) as f:
-            data = json.load(f)
-        threshold = float(data["youden"]["threshold"])
-        log.info(f"Youden threshold loaded: {threshold}")
-        return threshold
-    except Exception as e:
-        log.warning(f"Could not load threshold.json ({e}), falling back to 0.5")
-        return 0.5
-
-
 # ---------------------------------------------------------------------------
 # Preprocessing
 # ---------------------------------------------------------------------------
-
-TRANSFORM = transforms.Compose([
-    transforms.Resize((96, 96)),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406],
-        std=[0.229, 0.224, 0.225],
-    ),
-])
 
 LABELS = {0: "normal", 1: "tumour"}
 
 
 def preprocess(image_bytes: bytes) -> torch.Tensor:
     """
-    Convert raw image bytes to a normalised tensor batch of shape (1, 3, 96, 96).
-
-    Args:
-        image_bytes: raw bytes from the uploaded file
-
-    Returns:
-        torch.Tensor: preprocessed batch ready for model inference
+    Convert raw image bytes to a normalised tensor batch using timm transform.
 
     Raises:
         ValueError: if the bytes cannot be decoded as an image
@@ -277,7 +221,8 @@ def preprocess(image_bytes: bytes) -> torch.Tensor:
         image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
     except Exception as e:
         raise ValueError(f"Could not decode image: {e}")
-    return TRANSFORM(image).unsqueeze(0)
+    transform = app_state["transform"]
+    return transform(image).unsqueeze(0)
 
 
 # ---------------------------------------------------------------------------
@@ -299,13 +244,14 @@ async def lifespan(app: FastAPI):
     deprecated event hooks.
     """
     log.info("Service starting — loading model...")
-    cfg       = ServingConfig.from_env()
-    model     = load_model(cfg)
-    threshold = load_threshold(cfg)
+    cfg   = ServingConfig.from_env()
+    model = load_model(cfg)
+    data_config = timm.data.resolve_model_data_config(model)
+    transform   = timm.data.create_transform(**data_config, is_training=False)
     app_state["model"]     = model
     app_state["cfg"]       = cfg
     app_state["device"]    = cfg.resolved_device
-    app_state["threshold"] = threshold
+    app_state["transform"] = transform
     # Expose static model metadata as a Prometheus Info metric.
     # This shows up in Grafana as a label set on the pcam_model_info series —
     # useful for correlating AUC/latency shifts with model version changes.
@@ -393,18 +339,16 @@ async def predict(file: UploadFile = File(...)):
     REQUEST_LATENCY.labels(endpoint="/predict").observe(latency_ms)
     REQUEST_COUNT.labels(endpoint="/predict", status="200").inc()
 
-    # Model uses num_classes=1 with BCEWithLogitsLoss — single sigmoid output.
-    # sigmoid gives P(tumour); threshold from threshold.json (Youden optimal).
-    prob_tumour = float(torch.sigmoid(logits).squeeze())
-    threshold   = app_state["threshold"]
-    class_idx   = int(prob_tumour >= threshold)
+    # TIAToolbox ResNet-18: 2-class softmax, class 0 = normal, class 1 = tumour.
+    probs       = torch.softmax(logits, dim=1).squeeze()
+    prob_tumour = float(probs[1])
+    class_idx   = int(prob_tumour >= 0.5)
     confidence  = prob_tumour if class_idx == 1 else 1.0 - prob_tumour
 
     return JSONResponse({
         "label":       LABELS[class_idx],
         "confidence":  round(confidence, 4),
         "prob_tumour": round(prob_tumour, 4),
-        "threshold":   round(threshold, 4),
         "latency_ms":  round(latency_ms, 2),
     })
 
