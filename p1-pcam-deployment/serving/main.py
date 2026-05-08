@@ -31,7 +31,6 @@ Design principles:
 """
 
 import io
-import json
 import logging
 import os
 import sys
