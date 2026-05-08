@@ -338,9 +338,9 @@ async def predict(file: UploadFile = File(...)):
     REQUEST_LATENCY.labels(endpoint="/predict").observe(latency_ms)
     REQUEST_COUNT.labels(endpoint="/predict", status="200").inc()
 
-    # TIAToolbox ResNet-18: 2-class softmax, class 0 = normal, class 1 = tumour.
+    # TIAToolbox ResNet-18: 2-class softmax, class 0 = tumour, class 1 = normal.
     probs       = torch.softmax(logits, dim=1).squeeze()
-    prob_tumour = float(probs[1])
+    prob_tumour = float(probs[0])
     class_idx   = int(prob_tumour >= 0.5)
     confidence  = prob_tumour if class_idx == 1 else 1.0 - prob_tumour
 
