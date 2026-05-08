@@ -289,6 +289,80 @@ failure is in a goroutine that calls `os.Exit(2)` before logging.
 
 ---
 
+### ISS-010 — CoreDNS forwards to Google 8.8.8.8 (DNS leakage + MITM risk)
+
+| | |
+|---|---|
+| **Status** | Open — workaround in place, proper fix pending |
+| **Likelihood** | 5 — Active now, every external DNS query leaks |
+| **Impact** | 3 — Privacy and MITM risk; no immediate service outage |
+| **Detection** | 5 — Silent, no alert |
+| **Recovery** | 2 — Replace with Unbound, ~30 min |
+| **Risk score** | 15 / 25 🟠 |
+
+**What happened:**
+MAAS DNS (`192.168.1.90`) intermittently drops packets, causing CoreDNS to fail
+external name resolution (`ghcr.io`, `rest.uniprot.org`, `eutils.ncbi.nlm.nih.gov`).
+A fallback to `8.8.8.8` was added as a short-term fix to restore service.
+
+**Security weaknesses introduced:**
+1. **DNS leakage** — external queries that MAAS can't answer are forwarded to Google.
+   Google sees what external services the cluster queries. Also, failed internal hostname
+   lookups are forwarded externally, leaking internal naming conventions.
+2. **DNS hijacking risk** — if traffic to `8.8.8.8` is intercepted (MITM), an attacker
+   could return false IPs for `ghcr.io` or external APIs, redirecting image pulls or
+   API calls to malicious endpoints.
+3. **No DNSSEC validation** — neither MAAS DNS nor the current CoreDNS config validates
+   DNSSEC signatures, making spoofing easier.
+
+**Proper fix — deploy Unbound as a recursive resolver:**
+
+Unbound is a validating, recursive DNS resolver. It resolves external names itself
+by walking the DNS hierarchy from root servers — no forwarding to Google required.
+Supports DNSSEC validation out of the box.
+
+Deploy as a Kubernetes DaemonSet or as a service on `turtle-mgmt`:
+
+```yaml
+# cluster/manifests/unbound.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: unbound
+  namespace: kube-system
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: unbound
+  template:
+    spec:
+      containers:
+      - name: unbound
+        image: mvance/unbound:latest
+        ports:
+        - containerPort: 5335
+          protocol: UDP
+```
+
+Then update CoreDNS to forward to Unbound instead of MAAS/8.8.8.8:
+```
+forward . <unbound-service-ip>:5335
+```
+
+MAAS DNS remains for internal hostname resolution only — add a separate
+zone entry in CoreDNS for the internal domain:
+```
+homelab.local:53 {
+    forward . 192.168.1.90
+}
+```
+
+**Current state:** `8.8.8.8` fallback active. External DNS works but leaks queries.
+Unbound deployment tracked as cluster improvement.
+
+---
+
 ## Summary
 
 | ID | Issue | Risk | Status |
@@ -300,8 +374,9 @@ failure is in a goroutine that calls `os.Exit(2)` before logging.
 | ISS-005 | ghcr-pull-secret not propagated to new namespaces | 🟠 15 | Open |
 | ISS-006 | No default StorageClass / Ceph not fully operational | 🟠 12 | Resolved |
 | ISS-007 | CI pushes full SHA but values.yaml stores short SHA | 🔴 20 | Resolved |
+| ISS-010 | CoreDNS forwards to 8.8.8.8 — DNS leakage + MITM risk | 🟠 15 | Open |
 
-**Open items: ISS-005, ISS-009**
+**Open items: ISS-005, ISS-009, ISS-010**
 
 ---
 
