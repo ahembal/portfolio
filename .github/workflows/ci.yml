@@ -50,7 +50,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install -q -r serving/requirements.txt --index-url https://download.pytorch.org/whl/cpu
+          pip install -q -r serving/requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
           pip install -q pytest pytest-cov ruff httpx
         working-directory: p1-pcam-deployment
 
