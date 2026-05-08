@@ -6,6 +6,24 @@ why, and the current state so the cluster can be reconstructed after a failure.
 
 ---
 
+## 2026-05-08 — CoreDNS fallback DNS added
+
+**Problem:** MAAS DNS (`192.168.1.90`) intermittently drops packets. CoreDNS had
+no fallback — external queries (`ghcr.io`, `rest.uniprot.org`, `eutils.ncbi.nlm.nih.gov`)
+failed randomly, causing image pull failures and UniProt/PubMed API errors in pods.
+
+**Change made:**
+Updated CoreDNS configmap to forward to MAAS first, then `8.8.8.8`:
+```
+forward . 192.168.1.90 8.8.8.8
+```
+Previously: `forward . /etc/resolv.conf` (MAAS only, no fallback).
+
+**Current state:** External DNS resolves reliably. Internal names still resolve via
+MAAS. CoreDNS reloaded automatically after configmap patch.
+
+---
+
 ## 2026-04-27 — NTP clock skew fix (ISS-001)
 
 **Problem:** All 3 nodes were pointing NTP at `192.168.1.87` (old MAAS IP).
