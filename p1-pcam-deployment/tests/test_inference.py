@@ -60,9 +60,10 @@ def client():
     import torch
 
     from serving.main import app, app_state
-    app_state["model"]  = mock_model
-    app_state["device"] = torch.device("cpu")
-    app_state["cfg"]    = MagicMock()
+    app_state["model"]     = mock_model
+    app_state["device"]    = torch.device("cpu")
+    app_state["cfg"]       = MagicMock()
+    app_state["threshold"] = 0.3694
 
     yield TestClient(app, raise_server_exceptions=True)
 

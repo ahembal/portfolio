@@ -31,6 +31,7 @@ Design principles:
 """
 
 import io
+import json
 import logging
 import os
 import sys
@@ -127,8 +128,9 @@ class ServingConfig:
     rgw_endpoint: str
     rgw_access_key: str
     rgw_secret_key: str
-    model_path: str = "/tmp/best_model.pt"
-    device:     str = "auto"
+    model_path:     str = "/tmp/best_model.pt"
+    threshold_path: str = "/tmp/threshold.json"
+    device:         str = "auto"
 
     @property
     def resolved_device(self) -> torch.device:
@@ -215,6 +217,33 @@ def load_model(cfg: ServingConfig) -> nn.Module:
     return model
 
 
+def load_threshold(cfg: ServingConfig) -> float:
+    """
+    Download threshold.json from RGW and return the Youden threshold.
+
+    Falls back to 0.5 if the file cannot be downloaded or parsed, so the
+    service still starts even if threshold.json is missing.
+    """
+    threshold_key = cfg.model_key.rsplit("/", 1)[0] + "/threshold.json"
+    log.info(f"Downloading threshold from s3://{cfg.bucket}/{threshold_key}")
+    rgw_cfg = RGWConfig(
+        endpoint=cfg.rgw_endpoint,
+        access_key=cfg.rgw_access_key,
+        secret_key=cfg.rgw_secret_key,
+    )
+    s3 = get_s3_client(rgw_cfg)
+    try:
+        s3.download_file(cfg.bucket, threshold_key, cfg.threshold_path)
+        with open(cfg.threshold_path) as f:
+            data = json.load(f)
+        threshold = float(data["youden"]["threshold"])
+        log.info(f"Youden threshold loaded: {threshold}")
+        return threshold
+    except Exception as e:
+        log.warning(f"Could not load threshold.json ({e}), falling back to 0.5")
+        return 0.5
+
+
 # ---------------------------------------------------------------------------
 # Preprocessing
 # ---------------------------------------------------------------------------
@@ -270,11 +299,13 @@ async def lifespan(app: FastAPI):
     deprecated event hooks.
     """
     log.info("Service starting — loading model...")
-    cfg   = ServingConfig.from_env()
-    model = load_model(cfg)
-    app_state["model"]  = model
-    app_state["cfg"]    = cfg
-    app_state["device"] = cfg.resolved_device
+    cfg       = ServingConfig.from_env()
+    model     = load_model(cfg)
+    threshold = load_threshold(cfg)
+    app_state["model"]     = model
+    app_state["cfg"]       = cfg
+    app_state["device"]    = cfg.resolved_device
+    app_state["threshold"] = threshold
     # Expose static model metadata as a Prometheus Info metric.
     # This shows up in Grafana as a label set on the pcam_model_info series —
     # useful for correlating AUC/latency shifts with model version changes.
@@ -363,18 +394,18 @@ async def predict(file: UploadFile = File(...)):
     REQUEST_COUNT.labels(endpoint="/predict", status="200").inc()
 
     # Model uses num_classes=1 with BCEWithLogitsLoss — single sigmoid output.
-    # torch.softmax on a 1-element dimension always returns 1.0, so we use
-    # sigmoid to get P(tumour), then derive label and confidence from that.
+    # sigmoid gives P(tumour); threshold from threshold.json (Youden optimal).
     prob_tumour = float(torch.sigmoid(logits).squeeze())
-    class_idx   = int(prob_tumour >= 0.5)   # Youden threshold is 0.3694 but
-                                             # 0.5 is safe default; caller can
-                                             # apply threshold.json externally
+    threshold   = app_state["threshold"]
+    class_idx   = int(prob_tumour >= threshold)
     confidence  = prob_tumour if class_idx == 1 else 1.0 - prob_tumour
 
     return JSONResponse({
-        "label":      LABELS[class_idx],
-        "confidence": round(confidence, 4),
-        "latency_ms": round(latency_ms, 2),
+        "label":       LABELS[class_idx],
+        "confidence":  round(confidence, 4),
+        "prob_tumour": round(prob_tumour, 4),
+        "threshold":   round(threshold, 4),
+        "latency_ms":  round(latency_ms, 2),
     })
 
 
