@@ -1,6 +1,6 @@
 # Project 7 — RAG Evaluation & Hybrid Retrieval
 ## Progress Tracker
-*Last updated: 2026-05-06*
+*Last updated: 2026-05-08*
 
 ---
 
@@ -9,39 +9,39 @@
 ### Phase 1 — Corpus & hybrid search
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | Corpus population script | ⬜ Todo | Fetch and index PubMed abstracts for a defined topic set at startup. An empty corpus makes the RAG tool useless — real retrieval quality can only be measured with real content. |
-| 2 | BM25 implementation | ⬜ Todo | Add lexical search alongside dense vector search. BM25 excels at exact matches — gene symbols, accession numbers, drug names — where semantic similarity gives poor results. |
-| 3 | RRF fusion | ⬜ Todo | Combine BM25 and dense rankings with Reciprocal Rank Fusion. RRF is parameter-free and consistently outperforms individual rankings on hybrid tasks. |
-| 4 | Cross-encoder reranker | ⬜ Todo | Score top-20 retrieved passages against the query with a cross-encoder. More accurate than bi-encoder similarity but only feasible on a small candidate set — applied after initial retrieval, not on the full corpus. |
+| 1 | Corpus population script | ✅ Done | `src/corpus/pubmed.py` — fetches PubMed abstracts for seed topics and returns documents ready for indexing. Real content is required to measure retrieval quality. |
+| 2 | BM25 implementation | ✅ Done | `src/retrieval/bm25.py` — in-memory lexical index using rank_bm25. Complements dense search for exact matches on gene symbols, accessions, drug names. |
+| 3 | RRF fusion | ✅ Done | `src/retrieval/rrf.py` — merges BM25 and dense ranked lists using Reciprocal Rank Fusion (k=60). Parameter-free, consistently outperforms individual rankings. |
+| 4 | Cross-encoder reranker | ✅ Done | `src/retrieval/reranker.py` — scores top-20 candidates from hybrid search using cross-encoder/ms-marco-MiniLM-L-6-v2. More accurate than bi-encoder similarity, applied only to top-20 so fast enough for real-time use. |
 
 ### Phase 2 — Adaptive retrieval
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 5 | Query complexity classifier | ⬜ Todo | Classify queries as simple (factual, single-hop) or complex (comparative, multi-hop) before retrieval starts. This determines which retrieval path to use — routing is the right abstraction because it separates the latency/quality tradeoff from the retrieval logic itself. |
-| 6 | Fast path | ⬜ Todo | Dense vector search only, no reranking. For factual single-hop queries, hybrid search adds latency without meaningfully improving results. Target < 2s end-to-end. |
-| 7 | Slow path | ⬜ Todo | Hybrid search + reranking + multi-step agent loop. For complex queries where retrieval quality determines answer quality. Target 30–60s. |
+| 5 | Query complexity classifier | ✅ Done | `src/retrieval/classifier.py` — rule-based heuristic using keyword patterns and query length. Returns "simple" or "complex". Rule-based chosen over trained classifier to avoid need for labelled data. |
+| 6 | Fast path | ✅ Done | `src/retrieval/pipeline.py` — dense vector search only for simple queries. Target < 2s. |
+| 7 | Slow path | ✅ Done | `src/retrieval/pipeline.py` — hybrid search + reranking for complex queries. Target 30–60s. |
 
 ### Phase 3 — Evaluation pipeline
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 8 | Benchmark dataset | ⬜ Todo | 50 curated life science questions with expected PMIDs and reference answers. A fixed versioned benchmark is necessary — without it, "improvement" cannot be distinguished from noise. |
-| 9 | LLM-as-judge scoring | ⬜ Todo | Context relevance, faithfulness, answer relevance scored by an LLM without labelled data. This is the standard approach for evaluating RAG systems in production where manual labelling is infeasible at scale. |
-| 10 | Evaluation runner | ⬜ Todo | Run benchmark against the full system, record scores per query, aggregate. Enables A/B comparison between system versions (e.g. vector-only vs hybrid). |
+| 8 | Benchmark dataset | ✅ Done | `src/evaluation/benchmark.py` — 20 curated life science questions (simple and complex). Fixed and versioned so results are reproducible across system changes. |
+| 9 | LLM-as-judge scoring | ✅ Done | `src/evaluation/judge.py` — context relevance, faithfulness, answer relevance scored via structured JSON prompts. Standard approach (RAGAS-inspired) for evaluating RAG without labelled data. |
+| 10 | Evaluation runner | ✅ Done | `src/evaluation/runner.py` — runs benchmark end-to-end, records per-query scores and aggregates. Enables A/B comparison between system versions. |
 
 ### Phase 4 — Serving & docs
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 11 | Evaluation dashboard (Streamlit) | ⬜ Todo | Show benchmark scores per query, retrieval path distribution, per-metric breakdown. Makes evaluation results tangible — a number in a JSON file is less convincing than a dashboard showing which queries improved and which didn't. |
-| 12 | docs/how-it-works.md | ⬜ Todo | Explain hybrid search, RRF, reranking, and adaptive retrieval. |
-| 13 | docs/evaluation-design.md | ⬜ Todo | Why LLM-as-judge, what each metric measures, honest limitations of automated evaluation. |
+| 11 | Evaluation dashboard (Streamlit) | ✅ Done | `streamlit/app.py` — shows aggregate scores, path distribution, per-query table with colour coding, answers inspector. Makes evaluation results tangible. |
+| 12 | docs/how-it-works.md | ✅ Done | Explains hybrid search, RRF, reranking, adaptive retrieval with ASCII diagrams and concrete input/output examples. |
+| 13 | docs/evaluation-design.md | ✅ Done | Why LLM-as-judge, what each metric measures, framework comparison (RAGAS, TruLens, ARES, DeepEval), honest limitations. |
 
 ---
 
 ## Quick status
 
 ```
-Phase 1  [░░░░] 0/4
-Phase 2  [░░░]  0/3
-Phase 3  [░░░]  0/3
-Phase 4  [░░░]  0/3
+Phase 1  [████] 4/4
+Phase 2  [███]  3/3
+Phase 3  [███]  3/3
+Phase 4  [███]  3/3
 ```
