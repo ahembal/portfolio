@@ -9,7 +9,7 @@ reliably returns empty content with Llama 3.1 8B.
 
 import json
 import os
-from typing import Annotated, Any
+from typing import Annotated
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, ToolMessage
 from langchain_ollama import ChatOllama
@@ -25,6 +25,7 @@ from src.tools import (
     uniprot_lookup,
 )
 
+
 # ---------------------------------------------------------------------------
 # State
 # ---------------------------------------------------------------------------
@@ -37,74 +38,8 @@ class AgentState(TypedDict):
 # Tool registry
 # ---------------------------------------------------------------------------
 
-_TOOLS: dict[str, Any] = {
-    "pubmed_search": pubmed_search,
-    "pubmed_fetch": pubmed_fetch,
-    "uniprot_lookup": uniprot_lookup,
-    "rag_search": rag_search,
-}
-
-_TOOL_SCHEMAS = [
-    {
-        "type": "function",
-        "function": {
-            "name": "pubmed_search",
-            "description": "Search PubMed for articles matching a keyword query.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "max_results": {"type": "integer", "default": 5},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "pubmed_fetch",
-            "description": "Fetch the full abstract and metadata for a single PubMed article.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "pmid": {"type": "string"},
-                },
-                "required": ["pmid"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "uniprot_lookup",
-            "description": "Look up a protein or gene in UniProt.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "organism": {"type": "string", "default": "human"},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-    {
-        "type": "function",
-        "function": {
-            "name": "rag_search",
-            "description": "Search the local vector store for relevant passages.",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "query": {"type": "string"},
-                    "k": {"type": "integer", "default": 5},
-                },
-                "required": ["query"],
-            },
-        },
-    },
-]
+_TOOLS = [pubmed_search, pubmed_fetch, uniprot_lookup, rag_search]
+_TOOL_MAP = {t.name: t for t in _TOOLS}
 
 
 # ---------------------------------------------------------------------------
@@ -115,7 +50,7 @@ def _build_llm() -> ChatOllama:
     return ChatOllama(
         model=os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
         base_url=os.getenv("OLLAMA_BASE_URL", "http://localhost:11434"),
-    ).bind_tools(_TOOL_SCHEMAS)
+    ).bind_tools(_TOOLS)
 
 
 def reason(state: AgentState) -> dict:
@@ -132,12 +67,12 @@ def act(state: AgentState) -> dict:
     tool_messages: list[ToolMessage] = []
 
     for call in last.tool_calls:
-        fn = _TOOLS.get(call["name"])
-        if fn is None:
+        tool = _TOOL_MAP.get(call["name"])
+        if tool is None:
             result = {"error": f"unknown tool: {call['name']}"}
         else:
             try:
-                result = fn(**call["args"])
+                result = tool.invoke(call["args"])
             except Exception as exc:
                 result = {"error": str(exc)}
 

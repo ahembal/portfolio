@@ -11,7 +11,7 @@ What is checked for each question:
 """
 
 import pytest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from langchain_core.messages import AIMessage, ToolMessage
 
@@ -56,21 +56,18 @@ class TestGraphRouting:
 
     def test_act_node_calls_pubmed_search(self):
         from src.agent.graph import act, AgentState
-        import src.agent.graph as g
 
         call = _make_tool_call("pubmed_search", {"query": "TP53 glioblastoma"}, "c1")
         ai_msg = _ai_with_tools(call)
         state: AgentState = {"messages": [ai_msg]}
 
-        mock_fn = MagicMock(return_value=[{"pmid": "12345", "title": "TP53 in GBM"}])
-        original = g._TOOLS["pubmed_search"]
-        g._TOOLS["pubmed_search"] = mock_fn
-        try:
-            result = act(state)
-        finally:
-            g._TOOLS["pubmed_search"] = original
+        mock_tool = MagicMock()
+        mock_tool.invoke.return_value = [{"pmid": "12345", "title": "TP53 in GBM"}]
 
-        mock_fn.assert_called_once_with(query="TP53 glioblastoma")
+        with patch("src.agent.graph._TOOL_MAP", {"pubmed_search": mock_tool}):
+            result = act(state)
+
+        mock_tool.invoke.assert_called_once_with({"query": "TP53 glioblastoma"})
         assert len(result["messages"]) == 1
         assert result["messages"][0].tool_call_id == "c1"
 
@@ -88,21 +85,18 @@ class TestGraphRouting:
 
     def test_act_node_calls_uniprot_lookup(self):
         from src.agent.graph import act, AgentState
-        import src.agent.graph as g
 
         call = _make_tool_call("uniprot_lookup", {"query": "TP53", "organism": "human"}, "c2")
         ai_msg = _ai_with_tools(call)
         state: AgentState = {"messages": [ai_msg]}
 
-        mock_fn = MagicMock(return_value={"accession": "P04637", "gene": "TP53"})
-        original = g._TOOLS["uniprot_lookup"]
-        g._TOOLS["uniprot_lookup"] = mock_fn
-        try:
-            result = act(state)
-        finally:
-            g._TOOLS["uniprot_lookup"] = original
+        mock_tool = MagicMock()
+        mock_tool.invoke.return_value = {"accession": "P04637", "gene": "TP53"}
 
-        mock_fn.assert_called_once_with(query="TP53", organism="human")
+        with patch("src.agent.graph._TOOL_MAP", {"uniprot_lookup": mock_tool}):
+            result = act(state)
+
+        mock_tool.invoke.assert_called_once_with({"query": "TP53", "organism": "human"})
         assert result["messages"][0].tool_call_id == "c2"
 
 

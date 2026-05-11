@@ -21,6 +21,8 @@ agent citations trustworthy and verifiable.
 import time
 
 from Bio import Entrez, Medline
+from langchain_core.tools import tool
+from pydantic import BaseModel, Field, field_validator
 
 ENTREZ_EMAIL = "emre.balsever@scilifelab.se"
 ENTREZ_TOOL  = "p6-research-agent"
@@ -32,6 +34,26 @@ def _configure():
     Entrez.tool  = ENTREZ_TOOL
 
 
+class PubmedSearchInput(BaseModel):
+    query: str
+    max_results: int = Field(default=5)
+
+    @field_validator("max_results", mode="before")
+    @classmethod
+    def clamp_max_results(cls, v):
+        return max(1, min(int(v or 5), 20))
+
+
+class PubmedFetchInput(BaseModel):
+    pmid: str
+
+    @field_validator("pmid", mode="before")
+    @classmethod
+    def clean_pmid(cls, v):
+        return str(v or "").strip()
+
+
+@tool("pubmed_search", args_schema=PubmedSearchInput)
 def search(query: str, max_results: int = 5) -> list[dict]:
     """
     Search PubMed for papers matching a query.
@@ -85,6 +107,7 @@ def search(query: str, max_results: int = 5) -> list[dict]:
         return [{"error": str(e)}]
 
 
+@tool("pubmed_fetch", args_schema=PubmedFetchInput)
 def fetch(pmid: str) -> dict:
     """
     Fetch the full abstract and metadata for a single PubMed record.

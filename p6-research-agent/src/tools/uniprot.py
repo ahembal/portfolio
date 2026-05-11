@@ -14,11 +14,29 @@ citations in the agent's answers trustworthy.
 """
 
 import requests
+from langchain_core.tools import tool
+from pydantic import BaseModel, Field, field_validator
 
 UNIPROT_BASE = "https://rest.uniprot.org/uniprotkb"
 TIMEOUT      = 10   # seconds
 
 
+class UniprotInput(BaseModel):
+    query: str
+    organism: str = Field(default="human")
+
+    @field_validator("query", mode="before")
+    @classmethod
+    def uppercase_gene(cls, v):
+        return (v or "").upper()
+
+    @field_validator("organism", mode="before")
+    @classmethod
+    def default_organism(cls, v):
+        return v or "human"
+
+
+@tool("uniprot_lookup", args_schema=UniprotInput)
 def lookup(query: str, organism: str = "human") -> dict:
     """
     Look up a protein by gene symbol, protein name, or UniProt accession.

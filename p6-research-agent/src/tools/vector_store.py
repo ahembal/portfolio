@@ -22,6 +22,8 @@ import hashlib
 
 import chromadb
 from chromadb.config import Settings
+from langchain_core.tools import tool
+from pydantic import BaseModel, Field
 from sentence_transformers import SentenceTransformer
 
 EMBED_MODEL   = "all-MiniLM-L6-v2"   # 22 MB, fast, good for sentence similarity
@@ -107,6 +109,12 @@ def index(
     return len(all_chunks)
 
 
+class RagSearchInput(BaseModel):
+    query: str
+    k: int = Field(default=5)
+
+
+@tool("rag_search", args_schema=RagSearchInput)
 def search(
     query: str,
     k: int = 5,

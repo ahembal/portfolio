@@ -6,7 +6,6 @@ All external HTTP calls are mocked — no network required.
 from unittest.mock import MagicMock, patch
 
 
-
 # ---------------------------------------------------------------------------
 # PubMed tests
 # ---------------------------------------------------------------------------
@@ -30,7 +29,7 @@ class TestPubmedSearch:
              ]), \
              patch("src.tools.pubmed.time.sleep"):
             from src.tools.pubmed import search
-            results = search("TP53 glioblastoma", max_results=1)
+            results = search.invoke({"query": "TP53 glioblastoma", "max_results": 1})
 
         assert isinstance(results, list)
         assert len(results) == 1
@@ -42,14 +41,14 @@ class TestPubmedSearch:
              patch("src.tools.pubmed.Entrez.read", return_value={"IdList": []}), \
              patch("src.tools.pubmed.time.sleep"):
             from src.tools.pubmed import search
-            results = search("xyznonexistenttopic12345")
+            results = search.invoke({"query": "xyznonexistenttopic12345"})
         assert results == []
 
     def test_returns_error_dict_on_exception(self):
         with patch("src.tools.pubmed.Entrez.esearch", side_effect=Exception("network error")), \
              patch("src.tools.pubmed.time.sleep"):
             from src.tools.pubmed import search
-            results = search("anything")
+            results = search.invoke({"query": "anything"})
         assert len(results) == 1
         assert "error" in results[0]
 
@@ -68,7 +67,7 @@ class TestPubmedFetch:
              }]), \
              patch("src.tools.pubmed.time.sleep"):
             from src.tools.pubmed import fetch
-            result = fetch("12345678")
+            result = fetch.invoke({"pmid": "12345678"})
 
         assert result["pmid"] == "12345678"
         assert result["year"] == "2023"
@@ -81,7 +80,7 @@ class TestPubmedFetch:
              patch("src.tools.pubmed.Medline.parse", return_value=[]), \
              patch("src.tools.pubmed.time.sleep"):
             from src.tools.pubmed import fetch
-            result = fetch("99999999")
+            result = fetch.invoke({"pmid": "99999999"})
         assert "error" in result
 
 
@@ -112,7 +111,7 @@ class TestUniprotLookup:
         }
         with patch("src.tools.uniprot.requests.get", return_value=self._mock_response(mock_data)):
             from src.tools.uniprot import lookup
-            result = lookup("TP53", organism="human")
+            result = lookup.invoke({"query": "TP53", "organism": "human"})
 
         assert result["accession"] == "P04637"
         assert result["gene"] == "TP53"
@@ -123,7 +122,7 @@ class TestUniprotLookup:
         with patch("src.tools.uniprot.requests.get",
                    return_value=self._mock_response({"results": []})):
             from src.tools.uniprot import lookup
-            result = lookup("NONEXISTENTGENE999")
+            result = lookup.invoke({"query": "NONEXISTENTGENE999"})
         assert "error" in result
 
     def test_returns_error_on_network_failure(self):
@@ -131,8 +130,15 @@ class TestUniprotLookup:
         with patch("src.tools.uniprot.requests.get",
                    side_effect=req.RequestException("timeout")):
             from src.tools.uniprot import lookup
-            result = lookup("TP53")
+            result = lookup.invoke({"query": "TP53"})
         assert "error" in result
+
+    def test_none_organism_defaults_to_human(self):
+        """Validator converts None organism to 'human'."""
+        from src.tools.uniprot import UniprotInput
+        m = UniprotInput(query="tp53", organism=None)
+        assert m.organism == "human"
+        assert m.query == "TP53"
 
 
 # ---------------------------------------------------------------------------
@@ -150,17 +156,17 @@ class TestVectorStore:
         n = index(docs, persist_dir=str(tmp_path))
         assert n >= 2
 
-        results = search("tumour suppressor", k=2, persist_dir=str(tmp_path))
+        # Call underlying function directly — persist_dir is not an LLM-facing arg
+        results = search.func(query="tumour suppressor", k=2, persist_dir=str(tmp_path))
         assert isinstance(results, list)
         assert len(results) >= 1
         assert "text" in results[0]
         assert "score" in results[0]
-        # Top result should be about TP53, not SciLifeLab
         assert "TP53" in results[0]["text"] or "tumour" in results[0]["text"].lower()
 
     def test_search_empty_corpus_returns_empty(self, tmp_path):
         from src.tools.vector_store import search
-        results = search("anything", k=3, persist_dir=str(tmp_path / "empty"))
+        results = search.func(query="anything", k=3, persist_dir=str(tmp_path / "empty"))
         assert results == []
 
     def test_index_deduplicates_on_reindex(self, tmp_path):
@@ -168,4 +174,4 @@ class TestVectorStore:
         docs = [{"text": "Same document indexed twice.", "source": "dup"}]
         n1 = index(docs, persist_dir=str(tmp_path))
         n2 = index(docs, persist_dir=str(tmp_path))
-        assert n1 == n2   # same count — upsert deduplicates by ID
+        assert n1 == n2
