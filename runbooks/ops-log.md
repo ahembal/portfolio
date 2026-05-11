@@ -6,6 +6,19 @@ why, and the current state so the cluster can be reconstructed after a failure.
 
 ---
 
+## 2026-05-11 — turtle-mgmt static IP + router DHCP audit
+
+**Changes made:**
+- Set turtle-mgmt to static IP via netplan (`/etc/netplan/01-static.yaml`)
+- Reserved turtle-mgmt MAC in ASUS router manual assignment
+- Confirmed all infrastructure IPs are outside the router DHCP pool — no conflict risk
+
+**Deferred:** Renumber infrastructure IPs to a clean `.2–99` range for clearer separation
+from home DHCP clients. Requires draining and rejoining Kubernetes nodes — plan as a
+separate maintenance window. IP details in `runbooks/hosts.local.md`.
+
+---
+
 ## 2026-05-08 — CoreDNS fallback DNS added
 
 **Problem:** MAAS DNS (`192.168.1.90`) intermittently drops packets. CoreDNS had
