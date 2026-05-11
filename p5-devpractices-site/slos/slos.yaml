@@ -1,0 +1,135 @@
+# Service Level Objectives
+# Portfolio homelab — all live services
+#
+# Format:
+#   service:   project identifier
+#   sli:       the Prometheus metric and query used to measure
+#   objective: the target (percentage or threshold)
+#   window:    rolling evaluation window
+#   alert:     Prometheus alerting rule name to fire on breach
+
+slos:
+
+  # ---------------------------------------------------------------------------
+  # p1 — PCam Inference
+  # ---------------------------------------------------------------------------
+
+  - id: p1-availability
+    service: p1-pcam-inference
+    description: Fraction of /predict requests that succeed (non-5xx)
+    sli:
+      metric: pcam_requests_total
+      query: |
+        1 - (
+          rate(pcam_requests_total{status="500"}[5m])
+          /
+          rate(pcam_requests_total{endpoint="/predict"}[5m])
+        )
+    objective: 0.99      # 99% of requests succeed
+    window: 30d
+    alert: P1AvailabilityBreached
+
+  - id: p1-latency
+    service: p1-pcam-inference
+    description: p99 inference latency under 2 seconds
+    sli:
+      metric: pcam_request_latency_ms
+      query: |
+        histogram_quantile(0.99,
+          rate(pcam_request_latency_ms_bucket{endpoint="/predict"}[5m])
+        )
+    objective: 2000      # milliseconds
+    window: 30d
+    alert: P1LatencyBreached
+
+  # ---------------------------------------------------------------------------
+  # p2 — Metadata Ingestion
+  # ---------------------------------------------------------------------------
+
+  - id: p2-pipeline-success
+    service: p2-metadata-ingestion
+    description: Fraction of ingestion jobs that complete successfully
+    sli:
+      metric: celery_job_status_total
+      query: |
+        rate(celery_job_status_total{status="success"}[5m])
+        /
+        rate(celery_job_status_total[5m])
+    objective: 0.99      # 99% of jobs succeed
+    window: 30d
+    alert: P2PipelineSuccessBreached
+
+  - id: p2-ingest-latency
+    service: p2-metadata-ingestion
+    description: p95 end-to-end pipeline latency under 30 seconds
+    sli:
+      metric: celery_job_duration_seconds
+      query: |
+        histogram_quantile(0.95,
+          rate(celery_job_duration_seconds_bucket[5m])
+        )
+    objective: 30        # seconds
+    window: 30d
+    alert: P2IngestLatencyBreached
+
+  # ---------------------------------------------------------------------------
+  # p4 — NLP Inference
+  # ---------------------------------------------------------------------------
+
+  - id: p4-availability
+    service: p4-nlp-inference
+    description: Fraction of /predict requests that succeed
+    sli:
+      metric: nlp_requests_total
+      query: |
+        rate(nlp_requests_total{label="success"}[5m])
+        /
+        rate(nlp_requests_total[5m])
+    objective: 0.99
+    window: 30d
+    alert: P4AvailabilityBreached
+
+  - id: p4-latency
+    service: p4-nlp-inference
+    description: p95 inference latency under 500ms
+    sli:
+      metric: nlp_request_latency_ms
+      query: |
+        histogram_quantile(0.95,
+          rate(nlp_request_latency_ms_bucket[5m])
+        )
+    objective: 500       # milliseconds
+    window: 30d
+    alert: P4LatencyBreached
+
+  # ---------------------------------------------------------------------------
+  # p6 — Research Agent
+  # ---------------------------------------------------------------------------
+
+  - id: p6-availability
+    service: p6-research-agent
+    description: Fraction of /query requests that succeed (non-5xx)
+    sli:
+      metric: query_errors_total
+      query: |
+        1 - (
+          rate(query_errors_total[5m])
+          /
+          rate(query_total[5m])
+        )
+    objective: 0.95      # 95% — lower target, LLM failures are expected
+    window: 30d
+    alert: P6AvailabilityBreached
+
+  - id: p6-latency
+    service: p6-research-agent
+    description: p95 agent query latency under 120 seconds
+    sli:
+      metric: query_latency_seconds
+      query: |
+        histogram_quantile(0.95,
+          rate(query_latency_seconds_bucket[5m])
+        )
+    objective: 120       # seconds — LLM inference is slow on CPU
+    window: 30d
+    alert: P6LatencyBreached
