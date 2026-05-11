@@ -18,7 +18,7 @@ image:
   # tag is updated automatically by the CI pipeline (ci.yml) after each
   # successful build. ArgoCD detects the change and syncs the cluster.
   # Set manually to "latest" for local dev / first deploy.
-  tag: "98278e3a8030e0cee04e9627e9db00041cbc95c6"
+  tag: "d9f2f424a7d80f4edc59544f2ad0e606de950fa0"
   # pullPolicy: Always ensures the cluster pulls the new tag on every rollout,
   # even if the tag name hasn't changed (e.g. "latest"). Use IfNotPresent only
   # when tags are immutable SHAs.
