@@ -55,7 +55,6 @@ from prometheus_client import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "infra" / "ceph-rgw"))
-from boto3_config import RGWConfig, get_s3_client
 
 logging.basicConfig(
     level=logging.INFO,
@@ -169,33 +168,16 @@ class ServingConfig:
 
 def load_model(cfg: ServingConfig) -> nn.Module:
     """
-    Download model weights from Ceph RGW and load via timm.
+    Load TIAToolbox ResNet-18 directly from HuggingFace Hub.
 
-    Uses TIAToolbox ResNet-18 architecture (2-class softmax, class 1 = tumour).
-    Weights are stored in RGW as model.safetensors.
+    Loading from HuggingFace guarantees the architecture config (input size 96×96,
+    normalization mean=0 std=1) matches exactly what the weights expect. Loading as
+    a generic resnet18 caused a preprocessing mismatch that produced wrong predictions.
     """
-    log.info(f"Downloading model from s3://{cfg.bucket}/{cfg.model_key}")
-    rgw_cfg = RGWConfig(
-        endpoint=cfg.rgw_endpoint,
-        access_key=cfg.rgw_access_key,
-        secret_key=cfg.rgw_secret_key,
-    )
-    s3 = get_s3_client(rgw_cfg)
-
-    try:
-        s3.download_file(cfg.bucket, cfg.model_key, cfg.model_path)
-    except Exception as e:
-        raise RuntimeError(
-            f"Failed to download model from s3://{cfg.bucket}/{cfg.model_key}: {e}"
-        )
-
+    hub_id = os.getenv("MODEL_HUB_ID", "hf-hub:1aurent/resnet18.tiatoolbox-pcam")
+    log.info(f"Loading model from {hub_id}")
     device = cfg.resolved_device
-    model  = timm.create_model(
-        "resnet18",
-        pretrained=False,
-        num_classes=2,
-        checkpoint_path=cfg.model_path,
-    )
+    model  = timm.create_model(hub_id, pretrained=True)
     model.to(device)
     model.eval()
     log.info(f"Model loaded on {device}")
