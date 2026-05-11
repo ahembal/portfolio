@@ -55,3 +55,29 @@ class 1 = normal`. This caused predictions to be exactly inverted.
 
 **Lesson:** Always verify the class index mapping when using a third-party model.
 Do not assume standard label ordering — check the model card or test with known examples.
+
+---
+
+## 4. Preprocessing mismatch — generic ResNet-18 config vs TIAToolbox config
+
+**Symptom:** Some tumour patches correctly classified, others returned `prob_tumour=0.0`
+despite TIAToolbox predicting `prob=1.000` on the same patches on Kaggle.
+
+**Root cause:** The serving code loaded TIAToolbox weights into a generic
+`timm.create_model("resnet18", ...)`. timm resolved the preprocessing config for a
+standard ResNet-18: input 224×224, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225).
+TIAToolbox expects: input 96×96, mean=(0, 0, 0), std=(1, 1, 1) — no normalization.
+
+The image size happened to be 96×96 already (hardcoded in the old transform), so that
+part was accidentally correct. But the normalization was wrong, producing corrupted
+inputs for some patches.
+
+**Fix:** Load the model directly from HuggingFace Hub using the full model ID:
+```python
+timm.create_model("hf-hub:1aurent/resnet18.tiatoolbox-pcam", pretrained=True)
+```
+timm then resolves the correct preprocessing config from the model card automatically.
+
+**Lesson:** When using a timm model from HuggingFace, always load via `hf-hub:<id>` —
+never load weights into a generic architecture. The model card config (input size,
+normalization) is part of the model, not just the weights.
