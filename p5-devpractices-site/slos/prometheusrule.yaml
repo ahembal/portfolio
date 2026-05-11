@@ -1,0 +1,151 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: portfolio-slo-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prom   # matches Prometheus ruleSelector
+spec:
+  groups:
+    - name: slo-alerts
+      rules:
+
+        # -----------------------------------------------------------------------
+        # p1 — PCam Inference
+        # -----------------------------------------------------------------------
+
+        - alert: P1AvailabilityBreached
+          expr: |
+            (
+              1 - (
+                rate(pcam_requests_total{status="500"}[5m])
+                /
+                rate(pcam_requests_total{endpoint="/predict"}[5m])
+              )
+            ) < 0.99
+          for: 5m
+          labels:
+            severity: warning
+            service: p1-pcam-inference
+            slo: p1-availability
+          annotations:
+            summary: "p1 availability below 99%"
+            description: "PCam inference error rate exceeds 1% over the last 5 minutes."
+
+        - alert: P1LatencyBreached
+          expr: |
+            histogram_quantile(0.99,
+              rate(pcam_request_latency_ms_bucket{endpoint="/predict"}[5m])
+            ) > 2000
+          for: 5m
+          labels:
+            severity: warning
+            service: p1-pcam-inference
+            slo: p1-latency
+          annotations:
+            summary: "p1 p99 latency above 2s"
+            description: "PCam inference p99 latency is {{ $value }}ms, exceeding 2000ms SLO."
+
+        # -----------------------------------------------------------------------
+        # p2 — Metadata Ingestion
+        # -----------------------------------------------------------------------
+
+        - alert: P2PipelineSuccessBreached
+          expr: |
+            (
+              rate(celery_job_status_total{status="success"}[5m])
+              /
+              rate(celery_job_status_total[5m])
+            ) < 0.99
+          for: 5m
+          labels:
+            severity: warning
+            service: p2-metadata-ingestion
+            slo: p2-pipeline-success
+          annotations:
+            summary: "p2 pipeline success rate below 99%"
+            description: "Metadata ingestion job failure rate exceeds 1%."
+
+        - alert: P2IngestLatencyBreached
+          expr: |
+            histogram_quantile(0.95,
+              rate(celery_job_duration_seconds_bucket[5m])
+            ) > 30
+          for: 5m
+          labels:
+            severity: warning
+            service: p2-metadata-ingestion
+            slo: p2-ingest-latency
+          annotations:
+            summary: "p2 p95 pipeline latency above 30s"
+            description: "Metadata ingestion p95 latency is {{ $value }}s, exceeding 30s SLO."
+
+        # -----------------------------------------------------------------------
+        # p4 — NLP Inference
+        # -----------------------------------------------------------------------
+
+        - alert: P4AvailabilityBreached
+          expr: |
+            (
+              rate(nlp_requests_total{label="success"}[5m])
+              /
+              rate(nlp_requests_total[5m])
+            ) < 0.99
+          for: 5m
+          labels:
+            severity: warning
+            service: p4-nlp-inference
+            slo: p4-availability
+          annotations:
+            summary: "p4 availability below 99%"
+            description: "NLP inference error rate exceeds 1%."
+
+        - alert: P4LatencyBreached
+          expr: |
+            histogram_quantile(0.95,
+              rate(nlp_request_latency_ms_bucket[5m])
+            ) > 500
+          for: 5m
+          labels:
+            severity: warning
+            service: p4-nlp-inference
+            slo: p4-latency
+          annotations:
+            summary: "p4 p95 latency above 500ms"
+            description: "NLP inference p95 latency is {{ $value }}ms, exceeding 500ms SLO."
+
+        # -----------------------------------------------------------------------
+        # p6 — Research Agent
+        # -----------------------------------------------------------------------
+
+        - alert: P6AvailabilityBreached
+          expr: |
+            (
+              1 - (
+                rate(query_errors_total[5m])
+                /
+                rate(query_total[5m])
+              )
+            ) < 0.95
+          for: 5m
+          labels:
+            severity: warning
+            service: p6-research-agent
+            slo: p6-availability
+          annotations:
+            summary: "p6 availability below 95%"
+            description: "Research agent error rate exceeds 5%."
+
+        - alert: P6LatencyBreached
+          expr: |
+            histogram_quantile(0.95,
+              rate(query_latency_seconds_bucket[5m])
+            ) > 120
+          for: 5m
+          labels:
+            severity: warning
+            service: p6-research-agent
+            slo: p6-latency
+          annotations:
+            summary: "p6 p95 latency above 120s"
+            description: "Research agent p95 latency is {{ $value }}s, exceeding 120s SLO."
