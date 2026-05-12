@@ -322,7 +322,7 @@ async def predict(file: UploadFile = File(...)):
 
     # TIAToolbox ResNet-18: 2-class softmax, class 0 = tumour, class 1 = normal.
     probs       = torch.softmax(logits, dim=1).squeeze()
-    prob_tumour = float(probs[0])
+    prob_tumour = float(probs[1])
     class_idx   = int(prob_tumour >= 0.5)
     confidence  = prob_tumour if class_idx == 1 else 1.0 - prob_tumour
 

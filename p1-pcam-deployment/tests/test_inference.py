@@ -34,9 +34,9 @@ def _make_mock_model():
     """Return a mock nn.Module whose forward() outputs 2-class logits."""
     import torch
     mock = MagicMock()
-    # TIAToolbox model: 2-class softmax, class 0 = tumour, class 1 = normal.
-    # [-2.0, 2.0] → softmax → ~[0.02, 0.98] → prob_tumour = 0.02 → label "normal".
-    mock.return_value = torch.tensor([[-2.0, 2.0]])
+    # TIAToolbox model: 2-class softmax, class 1 = tumour, class 0 = normal.
+    # [2.0, -2.0] → softmax → ~[0.98, 0.02] → prob_tumour = 0.02 → label "normal".
+    mock.return_value = torch.tensor([[2.0, -2.0]])
     return mock
 
 
