@@ -7,11 +7,9 @@ architecture: resnet18
 source: pretrained
 format: safetensors
 
-# SHA-256 of the weights file stored in RGW.
-# Verified with: python src/verify.py resnet18-tiatoolbox-pcam v1
-# Status: UNVERIFIED — must be filled before this entry is trusted.
-# Run: sha256sum <weights_file> to obtain value.
-sha: UNVERIFIED
+# HuggingFace repo commit hash — canonical version identifier provided by the platform.
+# Verify with: python src/verify.py resnet18-tiatoolbox-pcam v1
+sha: 8b027eeb8f7c0490f4cc30f43ca03ce3b0fe2ec4
 
 origin:
   type: huggingface

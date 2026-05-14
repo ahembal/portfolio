@@ -7,9 +7,10 @@ architecture: distilbert-base-uncased
 source: fine-tuned
 format: safetensors
 
-# SHA-256 of the weights file stored in RGW.
-# Status: UNVERIFIED — must be filled before this entry is trusted.
-sha: UNVERIFIED
+# SHA-256 of model.safetensors in RGW.
+# Computed with: RGW_ENDPOINT=... RGW_ACCESS_KEY=... RGW_SECRET_KEY=... python src/verify.py --compute distilbert-pubmed-rct v1
+# Verify with:   python src/verify.py distilbert-pubmed-rct v1
+sha: 85a297c5e4046c3d387167166ad3056e5356a22ad872255a3f4942416355ea42
 
 origin:
   type: rgw

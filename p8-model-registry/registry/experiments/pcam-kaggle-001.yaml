@@ -22,7 +22,7 @@ hyperparameters:
 
 artifact:
   location: s3://pcam-models/pcam/kaggle-001/best_model.pt
-  sha: UNVERIFIED
+  sha: f26a872671bbb1a1226b4d083640f372997c10e4f17a77fb01c7f3b5428f4f4f
   size_bytes: 44785153
 
 notes: >

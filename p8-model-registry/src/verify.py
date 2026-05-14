@@ -31,14 +31,17 @@ def _sha256(path: Path) -> str:
     return h.hexdigest()
 
 
-def _download_huggingface(hub_id: str, dest: Path) -> Path:
-    """Download model weights from HuggingFace Hub."""
-    import timm
-    import torch
-    model = timm.create_model(f"hf-hub:{hub_id}", pretrained=True)
-    weights_path = dest / "model.safetensors"
-    torch.save(model.state_dict(), weights_path)
-    return weights_path
+def _get_huggingface_commit(hub_id: str) -> str:
+    """
+    Get the current commit hash for a HuggingFace model repo.
+
+    HuggingFace uses commit hashes as canonical version identifiers.
+    This is the platform's own integrity mechanism — more reliable than
+    computing our own SHA-256 of a downloaded file.
+    """
+    from huggingface_hub import model_info
+    info = model_info(hub_id)
+    return info.sha
 
 
 def _download_rgw(location: str, dest: Path) -> Path:
@@ -88,40 +91,38 @@ def verify_model(model_id: str, version: str, compute_only: bool = False) -> boo
     origin = entry.get("origin", {})
     origin_type = origin.get("type")
 
-    print(f"Downloading {model_id} {version} from {origin_type}...")
+    print(f"Verifying {model_id} {version} from {origin_type}...")
 
-    with tempfile.TemporaryDirectory() as tmp:
-        tmp_path = Path(tmp)
-        try:
-            if origin_type == "huggingface":
-                weights_path = _download_huggingface(origin["hub_id"], tmp_path)
-            elif origin_type == "rgw":
-                weights_path = _download_rgw(origin["location"], tmp_path)
-            else:
-                print(f"ERROR: unsupported origin type '{origin_type}'")
-                return False
-        except Exception as e:
-            print(f"ERROR downloading weights: {e}")
-            return False
-
-        actual_sha = _sha256(weights_path)
-        print(f"Computed SHA-256: {actual_sha}")
-
-        if compute_only or registered_sha == "UNVERIFIED":
-            print(f"\nTo register this SHA, update {yaml_path.name}:")
-            print(f"  sha: {actual_sha}")
-            return True
-
-        if actual_sha == registered_sha:
-            print(f"✓ SHA verified — weights match registry entry")
-            return True
+    try:
+        if origin_type == "huggingface":
+            actual_sha = _get_huggingface_commit(origin["hub_id"])
+            print(f"HuggingFace commit hash: {actual_sha}")
+        elif origin_type == "rgw":
+            with tempfile.TemporaryDirectory() as tmp:
+                weights_path = _download_rgw(origin["location"], Path(tmp))
+                actual_sha = _sha256(weights_path)
+                print(f"Computed SHA-256: {actual_sha}")
         else:
-            print(f"✗ SHA MISMATCH")
-            print(f"  Registered: {registered_sha}")
-            print(f"  Actual:     {actual_sha}")
-            print(f"  The weights file does not match what was registered.")
-            print(f"  Do not deploy until this is resolved.")
+            print(f"ERROR: unsupported origin type '{origin_type}'")
             return False
+    except Exception as e:
+        print(f"ERROR: {e}")
+        return False
+
+    if compute_only or registered_sha == "UNVERIFIED":
+        print(f"\nTo register this, update {yaml_path.name}:")
+        print(f"  sha: {actual_sha}")
+        return True
+
+    if actual_sha == registered_sha:
+        print(f"✓ Verified — matches registry entry")
+        return True
+    else:
+        print(f"✗ MISMATCH")
+        print(f"  Registered: {registered_sha}")
+        print(f"  Actual:     {actual_sha}")
+        print(f"  Do not deploy until this is resolved.")
+        return False
 
 
 if __name__ == "__main__":
