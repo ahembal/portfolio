@@ -1,0 +1,111 @@
+# Model schema — WHAT the model is
+# Immutable once registered. A new version requires a new entry.
+# sha is mandatory — no model without a verified cryptographic hash.
+
+required:
+  - id
+  - version
+  - created_at
+  - task
+  - architecture
+  - source
+  - format
+  - origin
+  - preprocessing
+  - class_mapping
+  - sha
+
+fields:
+  id:
+    type: string
+    description: >
+      Unique identifier. Format: architecture-source-task[-variant].
+      Example: resnet18-tiatoolbox-pcam
+
+  version:
+    type: string
+    description: >
+      Immutable version tag. Increment only when weights or architecture change.
+      Format: v1, v2, v3.
+
+  created_at:
+    type: date
+    description: ISO 8601 date when this entry was registered.
+
+  task:
+    type: string
+    enum: [binary-classification, multiclass-classification, regression, embedding, generation]
+
+  architecture:
+    type: string
+    description: Model architecture name. Example: resnet18, distilbert-base-uncased.
+
+  source:
+    type: string
+    enum: [pretrained, trained, fine-tuned]
+    description: >
+      pretrained — weights from a third party, no training by us.
+      trained    — weights produced by our own training run (links to experiment).
+      fine-tuned — third-party weights further trained by us (links to both).
+
+  format:
+    type: string
+    enum: [safetensors, pt, onnx]
+
+  sha:
+    type: string
+    description: >
+      SHA-256 digest of the model weights file. Mandatory — no exceptions.
+      Verified by verify.py before any deployment is allowed.
+      A registry entry without a verified sha is not trusted.
+
+  origin:
+    type: object
+    description: Where the weights come from.
+    required: [type]
+    fields:
+      type:
+        type: string
+        enum: [huggingface, rgw, kaggle, paper]
+      hub_id:
+        type: string
+        description: HuggingFace model ID if type=huggingface.
+      license:
+        type: string
+      reference:
+        type: string
+        description: Paper or URL reference.
+      experiment_id:
+        type: string
+        description: Links to experiments/ entry if source=trained or fine-tuned.
+
+  training_data:
+    type: object
+    description: Required when source=trained or fine-tuned.
+    fields:
+      dataset: {type: string}
+      size: {type: integer, description: Number of training samples.}
+      source: {type: string, enum: [public, private, synthetic]}
+      split: {type: string, description: Which split was used for training.}
+
+  preprocessing:
+    type: object
+    required: [input_size, mean, std, normalization]
+    description: >
+      Exact preprocessing the model expects. Must match what serving applies.
+      Mismatch here caused the class inversion bug in p1 (see model-issues.md).
+    fields:
+      input_size: {type: list, description: "[channels, height, width]"}
+      mean: {type: list}
+      std: {type: list}
+      normalization: {type: string, enum: [none, imagenet, custom]}
+      interpolation: {type: string}
+
+  class_mapping:
+    type: object
+    description: >
+      Maps class index to label. Explicit and mandatory.
+      Never assume standard ordering — verify empirically.
+    example:
+      0: normal
+      1: tumour

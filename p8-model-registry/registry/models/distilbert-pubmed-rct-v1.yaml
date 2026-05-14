@@ -1,0 +1,44 @@
+id: distilbert-pubmed-rct
+version: v1
+created_at: "2026-05-12"
+
+task: multiclass-classification
+architecture: distilbert-base-uncased
+source: fine-tuned
+format: safetensors
+
+# SHA-256 of the weights file stored in RGW.
+# Status: UNVERIFIED — must be filled before this entry is trusted.
+sha: UNVERIFIED
+
+origin:
+  type: rgw
+  location: s3://nlp-models/pubmed-rct/v1/model.safetensors
+  license: unknown
+  experiment_id: pubmed-rct-kaggle-001
+
+training_data:
+  dataset: PubMed RCT 200k
+  size: 180040
+  source: public
+  split: train
+  notes: >
+    Fine-tuned from distilbert-base-uncased on PubMed RCT abstract sentence
+    classification. 5 classes: background, objective, method, result, conclusion.
+
+preprocessing:
+  input_size: null
+  mean: null
+  std: null
+  normalization: none
+  notes: >
+    Text input — tokenised with DistilBERT tokenizer (max_length=512).
+    No image preprocessing applies.
+
+class_mapping:
+  0: background
+  1: objective
+  2: method
+  3: result
+  4: conclusion
+  verified: true

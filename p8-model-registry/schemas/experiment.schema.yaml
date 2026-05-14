@@ -1,0 +1,68 @@
+# Experiment schema — WHY the weights exist
+# Records the training run that produced a set of weights.
+# Required for all source=trained or fine-tuned models.
+
+required:
+  - id
+  - date
+  - model_id
+  - framework
+  - compute
+  - hyperparameters
+  - artifact
+
+fields:
+  id:
+    type: string
+    description: Unique experiment ID. Format: project-descriptor. Example: pcam-kaggle-001.
+
+  date:
+    type: date
+    description: Date the training run was executed.
+
+  model_id:
+    type: string
+    description: Links to the model entry this experiment produced.
+
+  conducted_by:
+    type: string
+    description: Who ran the experiment.
+
+  framework:
+    type: object
+    required: [name, version]
+    fields:
+      name: {type: string, description: "pytorch, tensorflow, jax"}
+      version: {type: string}
+
+  compute:
+    type: object
+    required: [platform]
+    fields:
+      platform: {type: string, description: "kaggle, dardel, local"}
+      gpu: {type: string}
+      training_time_hours: {type: number}
+
+  hyperparameters:
+    type: object
+    description: All hyperparameters needed to reproduce the run.
+    fields:
+      epochs: {type: integer}
+      batch_size: {type: integer}
+      learning_rate: {type: number}
+      optimizer: {type: string}
+      loss: {type: string}
+      scheduler: {type: string}
+
+  artifact:
+    type: object
+    required: [location, sha]
+    description: Where the weights are stored and their cryptographic hash.
+    fields:
+      location: {type: string, description: "RGW path or HuggingFace hub ID"}
+      sha: {type: string, description: SHA-256 of the weights file.}
+      size_bytes: {type: integer}
+
+  notes:
+    type: string
+    description: Non-obvious observations from this run.

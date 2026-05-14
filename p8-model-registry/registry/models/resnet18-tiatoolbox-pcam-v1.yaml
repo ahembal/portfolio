@@ -1,0 +1,48 @@
+id: resnet18-tiatoolbox-pcam
+version: v1
+created_at: "2026-05-12"
+
+task: binary-classification
+architecture: resnet18
+source: pretrained
+format: safetensors
+
+# SHA-256 of the weights file stored in RGW.
+# Verified with: python src/verify.py resnet18-tiatoolbox-pcam v1
+# Status: UNVERIFIED — must be filled before this entry is trusted.
+# Run: sha256sum <weights_file> to obtain value.
+sha: UNVERIFIED
+
+origin:
+  type: huggingface
+  hub_id: 1aurent/resnet18.tiatoolbox-pcam
+  license: CC0-1.0
+  reference: >
+    Pocock et al. 2022. TIAToolbox as an end-to-end library for advanced
+    tissue image analytics. Communications Medicine.
+
+training_data:
+  dataset: PatchCamelyon (PCam)
+  size: 262144
+  source: public
+  split: train
+  notes: >
+    Trained by TIA Centre, University of Warwick.
+    We do not control or verify the training process — we trust the published weights.
+
+preprocessing:
+  input_size: [3, 96, 96]
+  mean: [0.0, 0.0, 0.0]
+  std: [1.0, 1.0, 1.0]
+  normalization: none
+  interpolation: bicubic
+
+class_mapping:
+  0: normal
+  1: tumour
+  verified: true
+  verification_notes: >
+    Verified empirically by testing on labelled PCam patches.
+    Initial assumption (class 0 = tumour) was wrong — caused inverted predictions
+    in production. Class 1 = tumour confirmed correct.
+    See p1-pcam-deployment/docs/model-issues.md §3 and §4.

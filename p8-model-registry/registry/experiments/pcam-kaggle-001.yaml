@@ -1,0 +1,33 @@
+id: pcam-kaggle-001
+date: "2026-04-20"
+model_id: resnet18-tiatoolbox-pcam
+conducted_by: emre
+
+framework:
+  name: pytorch
+  version: "2.0"
+
+compute:
+  platform: kaggle
+  gpu: T4
+  training_time_hours: 0.5
+
+hyperparameters:
+  epochs: 6
+  batch_size: 64
+  learning_rate: 0.001
+  optimizer: Adam
+  loss: BCEWithLogitsLoss
+  scheduler: CosineAnnealingLR
+
+artifact:
+  location: s3://pcam-models/pcam/kaggle-001/best_model.pt
+  sha: UNVERIFIED
+  size_bytes: 44785153
+
+notes: >
+  Training run produced weights now deprecated in favour of TIAToolbox pretrained
+  model (resnet18-tiatoolbox-pcam-v1). Our trained weights showed near-zero class
+  separation in serving — probabilities clustered around 0.37-0.41 for all patches.
+  Root cause not fully diagnosed. Replaced 2026-05-08.
+  See p1-pcam-deployment/docs/model-issues.md §2.

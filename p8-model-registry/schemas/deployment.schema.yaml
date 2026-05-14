@@ -1,0 +1,69 @@
+# Deployment schema — WHERE and WHEN the model runs
+# Mutable — updated when deployments change.
+# Must link to a verified model and a passed evaluation.
+# No deployment is valid without both.
+
+required:
+  - id
+  - model_id
+  - model_version
+  - evaluation_id
+  - environment
+  - deployed_at
+  - deployed_by
+  - status
+  - service
+
+fields:
+  id:
+    type: string
+    description: Unique deployment ID. Example: p1-pcam-inference-prod-001.
+
+  model_id:
+    type: string
+    description: Links to the model entry being deployed.
+
+  model_version:
+    type: string
+    description: Exact version of the model deployed.
+
+  evaluation_id:
+    type: string
+    description: >
+      Links to the evaluation that approved this model for deployment.
+      A model cannot be deployed without a referenced evaluation.
+      This is the governance gate.
+
+  environment:
+    type: string
+    enum: [production, staging, development]
+
+  deployed_at:
+    type: date
+
+  deployed_by:
+    type: string
+
+  status:
+    type: string
+    enum: [active, deprecated, retired]
+
+  service:
+    type: object
+    required: [project, name, image]
+    fields:
+      project: {type: string, description: "p1-pcam-deployment, p4-nlp-deployment"}
+      name: {type: string, description: Kubernetes service name.}
+      image: {type: string, description: Full container image reference with SHA tag.}
+      namespace: {type: string}
+
+  retired_at:
+    type: date
+    description: When this deployment was retired. Required when status=retired.
+
+  retired_reason:
+    type: string
+    description: Why this deployment was retired.
+
+  notes:
+    type: string

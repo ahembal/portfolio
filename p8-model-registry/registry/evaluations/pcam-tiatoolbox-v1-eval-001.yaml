@@ -1,0 +1,37 @@
+id: pcam-tiatoolbox-v1-eval-001
+date: "2026-05-12"
+model_id: resnet18-tiatoolbox-pcam
+model_version: v1
+evaluator: emre
+
+dataset:
+  name: PatchCamelyon (PCam)
+  split: test
+  size: 32768
+  source: kaggle — andrewmvd/metastatic-tissue-classification-patchcamelyon
+
+preprocessing:
+  normalization: none
+  input_size: [3, 96, 96]
+  notes: timm transform resolved from hf-hub:1aurent/resnet18.tiatoolbox-pcam
+
+threshold:
+  value: 0.5
+  method: default
+
+metrics:
+  auc: 0.96
+  accuracy: null
+  f1: null
+  sensitivity: null
+  specificity: null
+  notes: >
+    AUC 0.96 from Pocock et al. 2022 — not measured by us independently.
+    Independent evaluation against full test split not yet completed.
+    Demo patch evaluation (8 patches) showed correct classification on all 8
+    after class mapping fix. Not a statistically meaningful evaluation.
+
+notes: >
+  Evaluation is partial — metrics sourced from published paper, not our own run.
+  A full independent evaluation on the PCam test split is required before this
+  model can be considered properly evaluated. Tracked in PROGRESS.md.

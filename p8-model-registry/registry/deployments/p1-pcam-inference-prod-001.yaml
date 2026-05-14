@@ -1,0 +1,20 @@
+id: p1-pcam-inference-prod-001
+model_id: resnet18-tiatoolbox-pcam
+model_version: v1
+evaluation_id: pcam-tiatoolbox-v1-eval-001
+
+environment: production
+deployed_at: "2026-05-12"
+deployed_by: emre
+status: active
+
+service:
+  project: p1-pcam-deployment
+  name: pcam-pcam-inference
+  image: ghcr.io/ahembal/pcam-inference:d81ba5f94c5b82fb89d7f1838167684edd513a6d
+  namespace: pcam
+
+notes: >
+  Replaced our own trained weights (pcam-kaggle-001) with TIAToolbox pretrained
+  model due to zero class separation in serving. Class mapping verified empirically.
+  evaluation_id references a partial evaluation — full independent evaluation pending.

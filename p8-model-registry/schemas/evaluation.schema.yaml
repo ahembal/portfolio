@@ -1,0 +1,72 @@
+# Evaluation schema — PROOF the model performs as claimed
+# Metrics are NOT a property of the model — they are the result of running
+# the model on a specific dataset at a specific time by a specific person.
+# An evaluation without a dataset reference and evaluator is not a proof.
+
+required:
+  - id
+  - date
+  - model_id
+  - model_version
+  - dataset
+  - evaluator
+  - metrics
+
+fields:
+  id:
+    type: string
+    description: Unique evaluation ID. Example: pcam-tiatoolbox-v1-eval-001.
+
+  date:
+    type: date
+    description: Date the evaluation was run.
+
+  model_id:
+    type: string
+    description: Links to the model entry being evaluated.
+
+  model_version:
+    type: string
+    description: Exact version of the model evaluated.
+
+  evaluator:
+    type: string
+    description: Who or what ran the evaluation. Example: emre, kaggle-notebook-xyz.
+
+  dataset:
+    type: object
+    required: [name, split, size]
+    fields:
+      name: {type: string, description: Dataset name. Example: PatchCamelyon.}
+      split: {type: string, description: "train | val | test | custom"}
+      size: {type: integer, description: Number of samples evaluated.}
+      source: {type: string, description: Where the dataset came from.}
+
+  preprocessing:
+    type: string
+    description: >
+      Which preprocessing was applied. Must match the model schema.
+      Mismatches produce meaningless metrics.
+
+  threshold:
+    type: object
+    required: [value, method]
+    fields:
+      value: {type: number}
+      method: {type: string, enum: [default, youden, sensitivity_95pct, custom]}
+
+  metrics:
+    type: object
+    required: [auc]
+    description: All metrics must be non-null. Omit a metric rather than setting null.
+    fields:
+      auc: {type: number}
+      accuracy: {type: number}
+      f1: {type: number}
+      sensitivity: {type: number}
+      specificity: {type: number}
+      loss: {type: number}
+
+  notes:
+    type: string
+    description: Non-obvious observations about this evaluation.
