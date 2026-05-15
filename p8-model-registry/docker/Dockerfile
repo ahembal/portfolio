@@ -1,16 +1,12 @@
 # p8 benchmark image
-# Contains all ML dependencies for running PyTorch vs ONNX benchmarks.
-# Code is NOT baked in — fetched from git at runtime so the image
-# doesn't need to be rebuilt on every code change.
-#
-# Build triggers: requirements.txt changes only.
+# Clones the repo, runs benchmark, commits results back via SSH deploy key.
+# Deploy key is injected at runtime as a Kubernetes secret — not baked in.
 
 FROM python:3.12-slim
 
 WORKDIR /bench
 
-# Install git for runtime repo clone
-RUN apt-get update && apt-get install -y --no-install-recommends git && \
+RUN apt-get update && apt-get install -y --no-install-recommends git openssh-client && \
     rm -rf /var/lib/apt/lists/*
 
 # Install PyTorch CPU first — separate index URL
@@ -21,11 +17,12 @@ RUN pip install --no-cache-dir torch torchvision \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Entrypoint: clone repo, run benchmark, print results
+# Entrypoint:
+#   1. Configure SSH using deploy key mounted at /secrets/ssh-key
+#   2. Clone repo
+#   3. Run benchmark
+#   4. Commit and push results
 # Arguments: <model_id> <version>
-ENTRYPOINT ["/bin/sh", "-c", \
-    "git clone --depth 1 https://github.com/ahembal/portfolio.git /repo && \
-     cd /repo/p8-model-registry && \
-     PYTHONPATH=. python src/benchmark.py \"$1\" \"$2\" && \
-     cat benchmarks/\"$1\"-\"$2\"-*.yaml", \
-    "--"]
+COPY docker/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]

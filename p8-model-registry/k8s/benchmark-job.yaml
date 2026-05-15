@@ -7,8 +7,6 @@ spec:
   ttlSecondsAfterFinished: 3600
   template:
     spec:
-      # Pin to quick-thrush — the actual serving node.
-      # Benchmark numbers must match the serving environment.
       nodeSelector:
         kubernetes.io/hostname: quick-thrush
       restartPolicy: Never
@@ -25,3 +23,12 @@ spec:
             limits:
               cpu: "4000m"
               memory: "8Gi"
+          volumeMounts:
+            - name: ssh-key
+              mountPath: /secrets
+              readOnly: true
+      volumes:
+        - name: ssh-key
+          secret:
+            secretName: p8-benchmark-ssh-key
+            defaultMode: 0600
