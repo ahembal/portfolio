@@ -85,12 +85,15 @@ def _check_agreement(pt_out: np.ndarray, onnx_out: np.ndarray) -> dict:
     }
 
 
-def _verdict(agreement: dict, speedup_p50: float) -> str:
+def _verdict(agreement: dict, speedup_p50: float, speedup_p95: float, speedup_p99: float) -> str:
     if not agreement["passed"]:
         return "✗ Export broken — outputs disagree, do not use ONNX"
-    if speedup_p50 < 1.5:
-        return f"— Marginal gain ({speedup_p50:.2f}x), not worth conversion complexity"
-    return f"✓ ONNX recommended — outputs agree, {speedup_p50:.2f}x speedup at p50"
+    # Use the minimum speedup across all three percentiles — conservative estimate
+    min_speedup = min(speedup_p50, speedup_p95, speedup_p99)
+    summary = f"p50={speedup_p50:.2f}x p95={speedup_p95:.2f}x p99={speedup_p99:.2f}x"
+    if min_speedup < 1.5:
+        return f"— Marginal gain at some percentiles ({summary}), review before switching"
+    return f"✓ ONNX recommended — outputs agree, consistent speedup ({summary})"
 
 
 def benchmark_vision(model_id: str, version: str, entry: dict) -> dict:
@@ -128,6 +131,8 @@ def benchmark_vision(model_id: str, version: str, entry: dict) -> dict:
     onnx_p = _percentiles(onnx_latencies)
     agreement = _check_agreement(pt_output, onnx_output)
     speedup_p50 = round(pt_p["p50_ms"] / onnx_p["p50_ms"], 2)
+    speedup_p95 = round(pt_p["p95_ms"] / onnx_p["p95_ms"], 2)
+    speedup_p99 = round(pt_p["p99_ms"] / onnx_p["p99_ms"], 2)
 
     return {
         "pytorch": {**pt_p,   "memory_mb": pt_mem},
@@ -135,10 +140,10 @@ def benchmark_vision(model_id: str, version: str, entry: dict) -> dict:
         "output_agreement": agreement,
         "speedup": {
             "p50": f"{speedup_p50}x",
-            "p95": f"{round(pt_p['p95_ms'] / onnx_p['p95_ms'], 2)}x",
-            "p99": f"{round(pt_p['p99_ms'] / onnx_p['p99_ms'], 2)}x",
+            "p95": f"{speedup_p95}x",
+            "p99": f"{speedup_p99}x",
         },
-        "verdict": _verdict(agreement, speedup_p50),
+        "verdict": _verdict(agreement, speedup_p50, speedup_p95, speedup_p99),
     }
 
 

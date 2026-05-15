@@ -28,6 +28,42 @@ For each model × format (PyTorch, ONNX) combination:
 
 N = 100 runs. First 10 runs discarded as warmup.
 
+### How percentiles are calculated
+
+All 100 latency measurements are sorted from fastest to slowest:
+
+```
+[3.1ms, 3.2ms, 3.2ms, ... 3.25ms ... 3.35ms, 3.40ms, 3.42ms]
+  1st                    50th         95th     99th    100th
+```
+
+- p50 = the 50th value in the sorted list (median)
+- p95 = the 95th value
+- p99 = the 99th value
+
+Speedup at each percentile = PyTorch latency / ONNX latency at the same position.
+
+### Why speedup grows at higher percentiles
+
+ONNX Runtime has lower variance than PyTorch. PyTorch's execution involves the
+Python interpreter, garbage collector, and PyTorch's own memory allocator —
+these cause occasional pauses that push p95 and p99 higher. ONNX Runtime is
+pure C++ with predictable execution, so its worst-case latency stays close to
+its median.
+
+Example from a real run:
+
+```
+           p50      p95      p99
+PyTorch:  4.74ms   5.45ms   5.70ms   ← spread of ~1ms
+ONNX:     3.25ms   3.37ms   3.42ms   ← spread of ~0.17ms
+
+Speedup:  1.46x    1.62x    1.67x    ← grows because PyTorch's outliers are worse
+```
+
+This is why the verdict considers all three percentiles — using p50 alone
+would understate ONNX's advantage at tail latencies.
+
 ---
 
 ## Inputs
@@ -110,11 +146,14 @@ transformers produces incorrect graphs.
 
 ## Verdict criteria
 
+The verdict considers all three percentiles — not just p50. The minimum speedup
+across p50/p95/p99 is used as the conservative estimate.
+
 | Condition | Verdict |
 |-----------|---------|
 | Output agreement fails | ✗ Export broken — do not use ONNX |
-| Output agrees, speedup < 1.5× | — Marginal gain, not worth complexity |
-| Output agrees, speedup ≥ 1.5× | ✓ ONNX recommended |
+| Output agrees, min speedup < 1.5× | — Marginal gain at some percentiles, review before switching |
+| Output agrees, min speedup ≥ 1.5× | ✓ ONNX recommended — consistent speedup |
 
 The verdict is recorded in the result file and referenced in the deployment
 decision.
