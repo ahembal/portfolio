@@ -1,0 +1,27 @@
+apiVersion: argocd-image-updater.argoproj.io/v1alpha1
+kind: ImageUpdater
+metadata:
+  name: pcam-inference
+  namespace: argocd
+spec:
+  # Watch ArgoCD Application named pcam-inference in the argocd namespace
+  namespace: argocd
+  applicationRefs:
+    - namePattern: pcam-inference
+      images:
+        - imageName: ghcr.io/ahembal/pcam-inference
+          alias: pcam
+          commonUpdateSettings:
+            updateStrategy: digest
+            pullSecret: secret:argocd/ghcr-pull-secret#.dockerconfigjson
+          manifestTargets:
+            helm:
+              tag: image.tag
+
+  # Write new tag back to git — eliminates the CI race condition
+  writeBackConfig:
+    method: git
+    gitConfig:
+      repository: git@github.com:ahembal/portfolio.git
+      branch: main
+      writeBackTarget: helmvalues:p1-pcam-deployment/helm/pcam-inference/values.yaml
