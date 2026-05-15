@@ -62,13 +62,11 @@ kubectl config use-context emre@homelab-tailscale
 
 ## GitHub / git push
 
-SSH config uses multiplexing (`ControlMaster`). If `git push` hangs or authenticates
-as the wrong user (e.g. `aut-mujx` instead of `ahembal`), a stale master socket is
-the cause. Fix:
+SSH multiplexing (`ControlMaster`) is disabled for `github.com` in `~/.ssh/config`
+to prevent stale sockets causing `git push` to hang or authenticate as the wrong user.
 
+**If `git push` still hangs** (e.g. stale socket from an old session):
 ```bash
 ssh -O exit git@github.com   # kill the stale master socket
 git push                      # retries with a fresh connection
 ```
-
-The socket files live in `~/.ssh/` — look for entries matching `github.com`.
