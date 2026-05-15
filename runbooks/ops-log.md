@@ -6,6 +6,25 @@ why, and the current state so the cluster can be reconstructed after a failure.
 
 ---
 
+## 2026-05-15 — ArgoCD repo-server stuck on cordoned node
+
+**Problem:** All ArgoCD applications showed `Unknown` sync status. Error:
+`connection refused` to repo-server at its ClusterIP. Root cause: repo-server
+pod was scheduled on `sought-perch` (cordoned) and stuck in `Unknown` state
+for 18 days — never rescheduled because the pod was not force-deleted.
+
+**Fix:** Force-deleted the stuck pod. Kubernetes rescheduled it on `quick-thrush`.
+All applications returned to `Synced` after forced refresh.
+
+```bash
+kubectl delete pod argocd-repo-server-<id> -n argocd --force
+```
+
+**Prevention:** Pin argocd-repo-server to quick-thrush via nodeSelector to
+prevent it landing on sought-perch again. Add to cluster/playbooks/install-argocd.yml.
+
+---
+
 ## 2026-05-11 — turtle-mgmt static IP + router DHCP audit
 
 **Changes made:**
