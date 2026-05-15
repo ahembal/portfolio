@@ -19,6 +19,7 @@ independent but they share the same infrastructure and engineering patterns.
 | p6 | [Research Agent](p6-research-agent/) | LangGraph agent with PubMed + UniProt + RAG | ✅ Live |
 | p7 | [RAG Evaluation](p7-rag-evaluation/) | Hybrid search, reranking, adaptive retrieval, LLM-as-judge evaluation | 🔄 In progress |
 | p8 | [Model Registry](p8-model-registry/) | Model provenance, packaging (HuggingFace, ONNX), serving format benchmark | ⬜ Planned |
+| p9 | [Knowledge Graph](p9-knowledge-graph/) | RDF/OWL knowledge graph, SPARQL endpoint, ontology alignment, GraphRAG vs RAG comparison | ⬜ Planned |
 
 ---
 
