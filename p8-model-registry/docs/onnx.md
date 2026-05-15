@@ -136,11 +136,24 @@ correctly via `optimum-cli export onnx`.
 
 ## How p8 uses ONNX
 
-p8 exports each registered model to ONNX and benchmarks it against the native
-PyTorch format. The benchmark measures latency, memory footprint, and verifies
-output agreement between formats.
+ONNX Runtime is consistently faster than PyTorch on CPU inference for standard
+architectures — this is well established. The speed and size gains are real.
 
-The goal is to answer concretely: is the conversion complexity worth the
-latency and size gains for our specific models and hardware?
+p8 benchmarks both formats for two specific reasons:
+
+**1. Verify output agreement before switching.**
+An ONNX export that produces different predictions than PyTorch is a broken
+export — it cannot be used regardless of speed. Running both on identical inputs
+confirms the exported model is correct before replacing the production format.
+
+**2. Measure the actual gain on our hardware.**
+"2–4× faster" is a general claim across many models and machines. The benchmark
+measures the actual number on `quick-thrush` CPU with our specific models —
+ResNet-18 (vision) and DistilBERT (text). This is what justifies the decision
+to switch the serving container from PyTorch to ONNX Runtime.
+
+The output of the benchmark answers two questions:
+- Are the predictions identical? (correctness gate)
+- How much faster is ONNX on this hardware? (justification for switching)
 
 See `docs/benchmark-design.md` for the benchmark methodology.
