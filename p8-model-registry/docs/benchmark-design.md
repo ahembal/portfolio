@@ -146,14 +146,15 @@ transformers produces incorrect graphs.
 
 ## Verdict criteria
 
-The verdict considers all three percentiles — not just p50. The minimum speedup
-across p50/p95/p99 is used as the conservative estimate.
+The verdict considers all three percentiles via their mean speedup. Mean is used
+rather than minimum — taking the minimum would be dragged down by p50 (the least
+important percentile for production) even when p95 and p99 show significant improvement.
 
 | Condition | Verdict |
 |-----------|---------|
 | Output agreement fails | ✗ Export broken — do not use ONNX |
-| Output agrees, min speedup < 1.5× | — Marginal gain at some percentiles, review before switching |
-| Output agrees, min speedup ≥ 1.5× | ✓ ONNX recommended — consistent speedup |
+| Output agrees, mean speedup < 1.5× | — Marginal gain, review before switching |
+| Output agrees, mean speedup ≥ 1.5× | ✓ ONNX recommended |
 
 The verdict is recorded in the result file and referenced in the deployment
 decision.

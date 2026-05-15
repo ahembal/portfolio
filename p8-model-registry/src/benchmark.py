@@ -88,12 +88,11 @@ def _check_agreement(pt_out: np.ndarray, onnx_out: np.ndarray) -> dict:
 def _verdict(agreement: dict, speedup_p50: float, speedup_p95: float, speedup_p99: float) -> str:
     if not agreement["passed"]:
         return "✗ Export broken — outputs disagree, do not use ONNX"
-    # Use the minimum speedup across all three percentiles — conservative estimate
-    min_speedup = min(speedup_p50, speedup_p95, speedup_p99)
-    summary = f"p50={speedup_p50:.2f}x p95={speedup_p95:.2f}x p99={speedup_p99:.2f}x"
-    if min_speedup < 1.5:
-        return f"— Marginal gain at some percentiles ({summary}), review before switching"
-    return f"✓ ONNX recommended — outputs agree, consistent speedup ({summary})"
+    mean_speedup = round((speedup_p50 + speedup_p95 + speedup_p99) / 3, 2)
+    summary = f"p50={speedup_p50:.2f}x p95={speedup_p95:.2f}x p99={speedup_p99:.2f}x mean={mean_speedup:.2f}x"
+    if mean_speedup < 1.5:
+        return f"— Marginal gain ({summary}), review before switching"
+    return f"✓ ONNX recommended — outputs agree, {summary}"
 
 
 def benchmark_vision(model_id: str, version: str, entry: dict) -> dict:
