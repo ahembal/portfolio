@@ -1,0 +1,13 @@
+# Used by benchmark.py and exporters. Install before running benchmarks.
+# torch and torchvision require the PyTorch index URL:
+#   pip install torch torchvision --index-url https://download.pytorch.org/whl/cpu
+#   pip install -r requirements.txt
+
+pyyaml>=6.0
+timm>=1.0.0
+onnx>=1.16
+onnxruntime>=1.18
+onnxscript>=0.1
+psutil>=5.9
+huggingface_hub>=0.23
+numpy>=1.24
