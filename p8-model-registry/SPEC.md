@@ -84,3 +84,10 @@ Run against the PCam demo patches and the NLP classifier inputs.
 - Automated retraining pipelines
 - Model monitoring in production (separate concern)
 - Training a new model from scratch for this project
+
+## Relationship to p10
+
+p8 is downstream of training — it tracks, packages, and benchmarks models that
+already exist. p10 (model training) is the upstream project that produces those
+models. The output of p10 feeds into p8: trained weights get a registry entry,
+an evaluation record, and a serving format benchmark before being deployed.

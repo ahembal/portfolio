@@ -18,8 +18,9 @@ independent but they share the same infrastructure and engineering patterns.
 | p5 | [Dev Practices Site](p5-devpractices-site/) | Cross-project patterns: CI/CD, testing, security, observability | 🔄 Content ready, site not built |
 | p6 | [Research Agent](p6-research-agent/) | LangGraph agent with PubMed + UniProt + RAG | ✅ Live |
 | p7 | [RAG Evaluation](p7-rag-evaluation/) | Hybrid search, reranking, adaptive retrieval, LLM-as-judge evaluation | 🔄 In progress |
-| p8 | [Model Registry](p8-model-registry/) | Model provenance, packaging (HuggingFace, ONNX), serving format benchmark | ⬜ Planned |
+| p8 | [Model Registry](p8-model-registry/) | Model provenance, packaging (HuggingFace, ONNX), serving format benchmark — downstream of training | 🔄 In progress |
 | p9 | [Knowledge Graph](p9-knowledge-graph/) | RDF/OWL knowledge graph, SPARQL endpoint, ontology alignment, GraphRAG vs RAG comparison | ⬜ Planned |
+| p10 | [Model Training](p10-model-training/) | Training pipeline, experiment tracking, evaluation, Grand Challenge submission — upstream of p8 | ⬜ Planned |
 
 ---
 
