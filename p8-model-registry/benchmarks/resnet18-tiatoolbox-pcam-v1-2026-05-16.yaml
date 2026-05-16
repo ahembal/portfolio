@@ -2,26 +2,26 @@ id: resnet18-tiatoolbox-pcam-v1-2026-05-16
 model_id: resnet18-tiatoolbox-pcam
 model_version: v1
 date: '2026-05-16'
-hardware: p8-benchmark-resnet18-tiatoolbox-pcam-v1-2-bmnrs
+hardware: p8-benchmark-resnet18-tiatoolbox-pcam-v1-2-l6j9t
 n_runs: 100
 warmup_runs: 10
 pytorch:
-  p50_ms: 21.92
-  p95_ms: 86.75
-  p99_ms: 101.54
-  memory_mb: 16.4
+  p50_ms: 49.27
+  p95_ms: 100.77
+  p99_ms: 187.45
+  memory_mb: 16.31
 onnx:
-  p50_ms: 2.53
-  p95_ms: 80.2
-  p99_ms: 81.59
+  p50_ms: 2.37
+  p95_ms: 48.56
+  p99_ms: 79.85
   memory_mb: 0.9
 output_agreement:
   max_abs_diff: 2.86e-06
   tolerance: 0.0001
   passed: true
 speedup:
-  p50: 8.66x
-  p95: 1.08x
-  p99: 1.24x
-verdict: "\u2713 ONNX recommended \u2014 outputs agree, p50=8.66x p95=1.08x p99=1.24x\
-  \ mean=3.66x"
+  p50: 20.79x
+  p95: 2.08x
+  p99: 2.35x
+verdict: "\u2713 ONNX recommended \u2014 outputs agree, p50=20.79x p95=2.08x p99=2.35x\
+  \ mean=8.41x"
