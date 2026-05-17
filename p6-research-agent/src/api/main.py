@@ -8,9 +8,13 @@ from fastapi import FastAPI, HTTPException
 from prometheus_client import Counter, Histogram, generate_latest
 from starlette.responses import PlainTextResponse
 
+from src.api.logging_config import setup_logging
+from src.api.middleware import RequestLoggingMiddleware
 from src.api.schemas import Citation, HealthResponse, QueryRequest, QueryResponse, StepRecord
 from src.agent.graph import build_graph
 from src.tools.vector_store import search as rag_search
+
+log = setup_logging()
 
 # ---------------------------------------------------------------------------
 # Metrics
@@ -33,14 +37,21 @@ _state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("service_starting", extra={
+        "ollama_url": os.getenv("OLLAMA_BASE_URL", "http://ollama:11434"),
+        "model":      os.getenv("OLLAMA_MODEL", "llama3.1:8b"),
+    })
     _state["graph"] = build_graph()
     _state["ollama_url"] = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
     _state["model"] = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    log.info("service_ready")
     yield
+    log.info("service_stopping")
     _state.clear()
 
 
 app = FastAPI(title="Research Agent API", lifespan=lifespan)
+app.add_middleware(RequestLoggingMiddleware)
 
 # ---------------------------------------------------------------------------
 # Routes
@@ -50,6 +61,8 @@ app = FastAPI(title="Research Agent API", lifespan=lifespan)
 async def query(req: QueryRequest):
     QUERY_TOTAL.inc()
     start = time.monotonic()
+
+    log.info("query_started", extra={"question": req.question[:100]})
 
     from langchain_core.messages import HumanMessage
 
@@ -63,6 +76,7 @@ async def query(req: QueryRequest):
         )
     except Exception as exc:
         QUERY_ERRORS.inc()
+        log.error("query_failed", extra={"exception.type": type(exc).__name__, "exception.message": str(exc)})
         raise HTTPException(status_code=500, detail=str(exc))
 
     latency_ms = (time.monotonic() - start) * 1000
@@ -71,8 +85,6 @@ async def query(req: QueryRequest):
     messages = result["messages"]
     answer = messages[-1].content if hasattr(messages[-1], "content") else str(messages[-1])
 
-    # Llama 3.1 8B in tool-use mode emits empty content when done.
-    # Synthesise an answer from tool results using a plain LLM call (no tools).
     if not answer.strip():
         from langchain_core.messages import HumanMessage as HM, ToolMessage as TM
         from langchain_ollama import ChatOllama
@@ -95,7 +107,6 @@ async def query(req: QueryRequest):
         )
         answer = synth.content
 
-    # Extract citations and steps from tool messages
     citations: list[Citation] = []
     steps: list[StepRecord] = []
     step_num = 0
@@ -106,7 +117,6 @@ async def query(req: QueryRequest):
             for call in msg.tool_calls:
                 step_num += 1
                 raw_output = ""
-                # find matching tool message
                 for m in messages:
                     if isinstance(m, ToolMessage) and m.tool_call_id == call["id"]:
                         raw_output = m.content
@@ -117,7 +127,6 @@ async def query(req: QueryRequest):
                     input=call["args"],
                     output=raw_output[:500],
                 ))
-                # extract citations from tool output
                 try:
                     data = json.loads(raw_output)
                     if call["name"] == "pubmed_search" and isinstance(data, list):
@@ -146,7 +155,6 @@ async def query(req: QueryRequest):
                 except (json.JSONDecodeError, TypeError):
                     pass
 
-    # Deduplicate citations by id
     seen: set[str] = set()
     unique_citations = []
     for c in citations:
@@ -154,19 +162,25 @@ async def query(req: QueryRequest):
             seen.add(c.id)
             unique_citations.append(c)
 
-    # Citation provenance check — flag identifiers in the answer that were
-    # never retrieved by a tool call. These are hallucinated citations.
     import re
     retrieved_ids = {c.id for c in unique_citations}
     cited_pmids = set(re.findall(r'\[PMID:(\d+)\]', answer))
     cited_uniprot = set(re.findall(r'\[UniProt:([A-Z0-9]+)\]', answer))
     hallucinated = (cited_pmids | cited_uniprot) - retrieved_ids
     if hallucinated:
+        log.warning("provenance_warning", extra={"hallucinated_ids": sorted(hallucinated)})
         answer += (
             f"\n\n⚠️ Provenance warning: the following identifiers appear in "
             f"the answer but were not retrieved by any tool call — they may be "
             f"hallucinated: {', '.join(sorted(hallucinated))}"
         )
+
+    log.info("query_completed", extra={
+        "latency_ms":   round(latency_ms, 1),
+        "tool_steps":   step_num,
+        "citations":    len(unique_citations),
+        "hallucinated": len(hallucinated),
+    })
 
     return QueryResponse(
         answer=answer,
