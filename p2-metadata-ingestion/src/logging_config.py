@@ -1,12 +1,12 @@
 """
-Structured JSON logging setup for p1 PCam inference service.
+Structured JSON logging setup for p2 metadata ingestion service.
 
 Emits OTel-compatible JSON log lines to stdout. Each line contains:
   timestamp, level, logger, message, service.name, environment,
   request_id (when available), and domain-specific fields.
 
 Usage:
-  from logging_config import setup_logging
+  from src.logging_config import setup_logging
   log = setup_logging()
 """
 
@@ -28,7 +28,7 @@ class JsonFormatter(logging.Formatter):
             "level":   record.levelname,
             "logger":  record.name,
             "message": record.getMessage(),
-            "service.name": os.getenv("SERVICE_NAME", "p1-pcam-inference"),
+            "service.name": os.getenv("SERVICE_NAME", "p2-metadata-ingestion"),
             "environment":  os.getenv("ENVIRONMENT", "production"),
         }
 
@@ -50,7 +50,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_entry)
 
 
-def setup_logging(name: str = "p1-pcam-inference") -> logging.Logger:
+def setup_logging(name: str = "p2-metadata-ingestion") -> logging.Logger:
     """
     Configure root logger to emit JSON and return a named logger.
 

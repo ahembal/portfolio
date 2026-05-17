@@ -1,3 +1,8 @@
+from logging_config import setup_logging
+from middleware import RequestLoggingMiddleware
+
+log = setup_logging()
+
 import asyncio
 import os
 import time
@@ -79,6 +84,7 @@ def _load_model() -> tuple:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("service_starting")
     tokenizer, model = _load_model()
     _state["tokenizer"] = tokenizer
     _state["model"] = model
@@ -88,6 +94,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="PubMed RCT Sentence Classifier", lifespan=lifespan)
+app.add_middleware(RequestLoggingMiddleware)
 
 # ---------------------------------------------------------------------------
 # Schemas

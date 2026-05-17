@@ -1,5 +1,5 @@
 """
-Structured JSON logging setup for p1 PCam inference service.
+Structured JSON logging setup for p4 NLP inference service.
 
 Emits OTel-compatible JSON log lines to stdout. Each line contains:
   timestamp, level, logger, message, service.name, environment,
@@ -28,7 +28,7 @@ class JsonFormatter(logging.Formatter):
             "level":   record.levelname,
             "logger":  record.name,
             "message": record.getMessage(),
-            "service.name": os.getenv("SERVICE_NAME", "p1-pcam-inference"),
+            "service.name": os.getenv("SERVICE_NAME", "p4-nlp-inference"),
             "environment":  os.getenv("ENVIRONMENT", "production"),
         }
 
@@ -50,7 +50,7 @@ class JsonFormatter(logging.Formatter):
         return json.dumps(log_entry)
 
 
-def setup_logging(name: str = "p1-pcam-inference") -> logging.Logger:
+def setup_logging(name: str = "p4-nlp-inference") -> logging.Logger:
     """
     Configure root logger to emit JSON and return a named logger.
 

@@ -76,7 +76,7 @@ async def query(req: QueryRequest):
         )
     except Exception as exc:
         QUERY_ERRORS.inc()
-        log.error("query_failed", extra={"exception.type": type(exc).__name__, "exception.message": str(exc)})
+        log.error("query_failed", extra={"exception_type": type(exc).__name__, "exception_message": str(exc)})
         raise HTTPException(status_code=500, detail=str(exc))
 
     latency_ms = (time.monotonic() - start) * 1000

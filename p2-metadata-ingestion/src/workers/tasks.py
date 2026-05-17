@@ -25,7 +25,7 @@ import time
 
 import magic
 from celery import Celery
-from celery.utils.log import get_task_logger
+from src.logging_config import setup_logging
 from prometheus_client import Counter, Histogram
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
@@ -39,7 +39,7 @@ from src.storage.s3 import (
     upload_bytes,
 )
 
-log = get_task_logger(__name__)
+log = setup_logging("p2-metadata-ingestion.worker")
 
 JOB_STATUS_TOTAL = Counter(
     "ingest_jobs_total",
@@ -113,6 +113,7 @@ def process_file(
     set status=failed with an error message.
     """
     t0 = time.perf_counter()
+    log.info("file_processing_started", extra={"job_id": job_id, "file_name": filename})
     session = _get_sync_session()
     try:
         # Mark processing
@@ -144,6 +145,7 @@ def process_file(
         bucket = storage_cfg["bucket"]
         ensure_bucket(s3, bucket)
         s3_key = build_s3_key(job_id, filename)
+        log.info("file_uploaded_to_s3", extra={"job_id": job_id, "s3_key": s3_key})
         upload_bytes(s3, bucket, s3_key, content, detected_type)
 
         # 4. Update record → done
@@ -155,6 +157,7 @@ def process_file(
 
         JOB_DURATION.observe(time.perf_counter() - t0)
         JOB_STATUS_TOTAL.labels(status="done").inc()
+        log.info("file_processing_done", extra={"job_id": job_id, "duration_ms": round((time.perf_counter() - t0) * 1000, 1)})
         return {"status": "done", "job_id": job_id, "sha256": sha256}
 
     except Exception as exc:
@@ -170,6 +173,7 @@ def process_file(
 
         JOB_DURATION.observe(time.perf_counter() - t0)
         JOB_STATUS_TOTAL.labels(status="failed").inc()
+        log.error("file_processing_failed", extra={"job_id": job_id, "exception_type": type(exc).__name__, "exception_message": str(exc)[:200]})
         raise self.retry(exc=exc)
 
     finally:

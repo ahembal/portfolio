@@ -50,6 +50,10 @@ from src.storage.db import (
     get_session_factory,
 )
 from src.workers.tasks import process_file
+from src.logging_config import setup_logging
+from src.middleware import RequestLoggingMiddleware
+
+log = setup_logging()
 
 # ---------------------------------------------------------------------------
 # Prometheus metrics
@@ -83,6 +87,7 @@ app_state: dict = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    log.info("service_starting")
     engine = get_engine()
     await create_tables(engine)
     app_state["session_factory"] = get_session_factory(engine)
@@ -91,6 +96,7 @@ async def lifespan(app: FastAPI):
     )
     yield
     await app_state["redis"].aclose()
+    log.info("service_stopping")
     await engine.dispose()
 
 
@@ -100,6 +106,7 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+app.add_middleware(RequestLoggingMiddleware)
 
 # ---------------------------------------------------------------------------
 # Endpoints
