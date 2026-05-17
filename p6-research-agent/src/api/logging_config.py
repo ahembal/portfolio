@@ -44,8 +44,8 @@ class JsonFormatter(logging.Formatter):
                 log_entry[key] = val
 
         if record.exc_info:
-            log_entry["exception.type"]    = record.exc_info[0].__name__
-            log_entry["exception.message"] = str(record.exc_info[1])
+            log_entry["exception_type"]    = record.exc_info[0].__name__
+            log_entry["exception_message"] = str(record.exc_info[1])
 
         return json.dumps(log_entry)
 
