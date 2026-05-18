@@ -1,7 +1,7 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: p8-benchmark-${MODEL_ID}-${VERSION}
+  name: p8-benchmark-distilbert-pubmed-rct-v1-1
   namespace: default
 spec:
   ttlSecondsAfterFinished: 3600
@@ -15,7 +15,7 @@ spec:
       containers:
         - name: benchmark
           image: ghcr.io/ahembal/p8-benchmark:latest
-          args: ["${MODEL_ID}", "${VERSION}"]
+          args: ["distilbert-pubmed-rct", "v1"]
           resources:
             requests:
               cpu: "2000m"
@@ -23,15 +23,6 @@ spec:
             limits:
               cpu: "4000m"
               memory: "8Gi"
-          # RGW credentials — required for text model benchmarks that download
-          # weights from Ceph RGW. Vision models pull from HuggingFace Hub and
-          # do not need these. Set only when the model origin.type is "rgw".
-          #
-          # Create the secret before deploying:
-          #   kubectl create secret generic p8-benchmark-rgw-credentials \
-          #     --from-literal=endpoint=http://192.168.1.200 \
-          #     --from-literal=access-key=<KEY> \
-          #     --from-literal=secret-key=<SECRET>
           env:
             - name: RGW_ENDPOINT
               valueFrom:

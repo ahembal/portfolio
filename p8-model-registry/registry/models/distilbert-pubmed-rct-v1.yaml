@@ -35,6 +35,12 @@ preprocessing:
   notes: >
     Text input — tokenised with DistilBERT tokenizer (max_length=512).
     No image preprocessing applies.
+    Uncased model: all text is lowercased before tokenisation, so "The" and
+    "the" are the same token. Cased is unnecessary here because sentence class
+    (background/objective/method/result/conclusion) is determined by meaning
+    and position in the abstract, not by capitalisation. Every sentence starts
+    with a capital by convention, so that signal is uniform across all classes
+    and carries no discriminative information.
 
 class_mapping:
   0: background

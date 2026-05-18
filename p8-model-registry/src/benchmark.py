@@ -11,12 +11,15 @@ Usage:
 """
 
 import datetime
+import json
+import os
 import platform
 import sys
 import tempfile
 import time
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 import numpy as np
 import psutil
@@ -95,6 +98,166 @@ def _verdict(agreement: dict, speedup_p50: float, speedup_p95: float, speedup_p9
     return f"✓ ONNX recommended — outputs agree, {summary}"
 
 
+def _download_from_rgw(location: str, dest: Path) -> Path:
+    """Download a file from RGW. Credentials read from env: RGW_ENDPOINT, RGW_ACCESS_KEY, RGW_SECRET_KEY."""
+    import boto3
+
+    parsed = urlparse(location)
+    bucket = parsed.netloc
+    key    = parsed.path.lstrip("/")
+
+    s3 = boto3.client(
+        "s3",
+        endpoint_url=os.environ["RGW_ENDPOINT"],
+        aws_access_key_id=os.environ["RGW_ACCESS_KEY"],
+        aws_secret_access_key=os.environ["RGW_SECRET_KEY"],
+    )
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    s3.download_file(bucket, key, str(dest))
+    return dest
+
+
+def _build_model_dir(entry: dict, tmp_dir: Path) -> Path:
+    """
+    Reconstruct a local HuggingFace model directory from a registry entry.
+
+    transformers.AutoModelForSequenceClassification.from_pretrained() requires
+    a directory containing three things: config.json (architecture + output
+    shape + class names), tokenizer files, and model weights. RGW only stores
+    the weights (model.safetensors) — the config and tokenizer are not saved
+    there because they are identical to the base model except for num_labels
+    and the class mapping.
+
+    This function assembles that directory in a temp location:
+      1. Downloads config.json from the base model on HuggingFace Hub
+      2. Patches num_labels and id2label/label2id to match the fine-tuned head
+      3. Copies tokenizer files from the base model (unchanged by fine-tuning)
+      4. Downloads fine-tuned weights from RGW
+    """
+    import shutil
+    from huggingface_hub import hf_hub_download
+
+    arch = entry["architecture"]  # e.g. "distilbert-base-uncased"
+    id2label = {
+        str(k): v
+        for k, v in entry["class_mapping"].items()
+        if isinstance(k, int)
+    }
+    label2id = {v: str(k) for k, v in id2label.items()}
+
+    model_dir = tmp_dir / "model"
+    model_dir.mkdir()
+    base_cache = tmp_dir / "base"
+
+    # Patch base config for fine-tuned classification head
+    config_src = hf_hub_download(arch, "config.json", local_dir=str(base_cache))
+    with open(config_src) as f:
+        config = json.load(f)
+    config.update({
+        "architectures": [f"{arch.split('-')[0].capitalize()}ForSequenceClassification"],
+        "num_labels": len(id2label),
+        "id2label": id2label,
+        "label2id": label2id,
+    })
+    with open(model_dir / "config.json", "w") as f:
+        json.dump(config, f, indent=2)
+
+    # Copy tokenizer files from base model
+    for fname in ["tokenizer.json", "tokenizer_config.json", "vocab.txt", "special_tokens_map.json"]:
+        try:
+            src = hf_hub_download(arch, fname, local_dir=str(base_cache))
+            shutil.copy(src, model_dir / fname)
+        except Exception:
+            pass
+
+    # Fine-tuned weights from RGW
+    _download_from_rgw(entry["origin"]["location"], model_dir / "model.safetensors")
+    return model_dir
+
+
+def benchmark_text(model_id: str, version: str, entry: dict) -> dict:
+    """Benchmark a text classification model (DistilBERT etc.)."""
+    import torch
+    from transformers import AutoModelForSequenceClassification, AutoTokenizer
+    from optimum.onnxruntime import ORTModelForSequenceClassification
+
+    # Representative sample across the 5 PubMed RCT classes
+    sample_texts = [
+        "Randomized controlled trials have shown that statins reduce cardiovascular events.",
+        "This study aimed to evaluate the efficacy of metformin in type 2 diabetes.",
+        "Patients were randomized 1:1 to receive either treatment A or placebo.",
+        "The primary endpoint was all-cause mortality at 12 months.",
+        "In conclusion, the intervention significantly reduced HbA1c levels.",
+    ]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        print("  Downloading model from RGW and building model directory...")
+        model_dir = _build_model_dir(entry, tmp_path)
+
+        tokenizer = AutoTokenizer.from_pretrained(str(model_dir))
+        pt_tokens = tokenizer(
+            sample_texts, return_tensors="pt",
+            padding=True, truncation=True, max_length=512,
+        )
+
+        # --- PyTorch ---
+        proc = psutil.Process()
+        before = proc.memory_info().rss
+        pt_model = AutoModelForSequenceClassification.from_pretrained(str(model_dir))
+        pt_model.eval()
+        pt_mem = round((proc.memory_info().rss - before) / 1024 / 1024, 2)
+
+        pt_latencies = []
+        pt_output = None
+        for i in range(BENCH_RUNS + WARMUP_RUNS):
+            t0 = time.perf_counter()
+            with torch.no_grad():
+                out = pt_model(**pt_tokens)
+            pt_latencies.append((time.perf_counter() - t0) * 1000)
+            if i == WARMUP_RUNS - 1:
+                pt_output = out.logits.numpy()
+        pt_latencies = pt_latencies[WARMUP_RUNS:]
+
+        # --- ONNX via optimum ---
+        before = proc.memory_info().rss
+        ort_model = ORTModelForSequenceClassification.from_pretrained(str(model_dir), export=True)
+        onnx_mem = round((proc.memory_info().rss - before) / 1024 / 1024, 2)
+
+        ort_tokens = tokenizer(
+            sample_texts, return_tensors="pt",
+            padding=True, truncation=True, max_length=512,
+        )
+        onnx_latencies = []
+        onnx_output = None
+        for i in range(BENCH_RUNS + WARMUP_RUNS):
+            t0 = time.perf_counter()
+            out = ort_model(**ort_tokens)
+            onnx_latencies.append((time.perf_counter() - t0) * 1000)
+            if i == WARMUP_RUNS - 1:
+                onnx_output = out.logits.numpy()
+        onnx_latencies = onnx_latencies[WARMUP_RUNS:]
+
+    pt_p   = _percentiles(pt_latencies)
+    onnx_p = _percentiles(onnx_latencies)
+    agreement = _check_agreement(pt_output, onnx_output)
+    speedup_p50 = round(pt_p["p50_ms"] / onnx_p["p50_ms"], 2)
+    speedup_p95 = round(pt_p["p95_ms"] / onnx_p["p95_ms"], 2)
+    speedup_p99 = round(pt_p["p99_ms"] / onnx_p["p99_ms"], 2)
+
+    return {
+        "pytorch": {**pt_p, "memory_mb": pt_mem},
+        "onnx":    {**onnx_p, "memory_mb": onnx_mem},
+        "output_agreement": agreement,
+        "speedup": {
+            "p50": f"{speedup_p50}x",
+            "p95": f"{speedup_p95}x",
+            "p99": f"{speedup_p99}x",
+        },
+        "verdict": _verdict(agreement, speedup_p50, speedup_p95, speedup_p99),
+    }
+
+
 def benchmark_vision(model_id: str, version: str, entry: dict) -> dict:
     """Benchmark a vision model (ResNet-18 etc.)."""
     import timm
@@ -169,11 +332,14 @@ def benchmark(model_id: str, version: str) -> dict:
     print(f"  Runs: {BENCH_RUNS} (+ {WARMUP_RUNS} warmup)")
 
     task = entry["task"]
-    if task == "binary-classification" and entry["architecture"].startswith("resnet"):
+    arch = entry["architecture"]
+    if task == "binary-classification" and arch.startswith("resnet"):
         results = benchmark_vision(model_id, version, entry)
+    elif task == "multiclass-classification" and arch.startswith("distilbert"):
+        results = benchmark_text(model_id, version, entry)
     else:
         raise NotImplementedError(
-            f"Benchmark not implemented for task={task}, arch={entry['architecture']}. "
+            f"Benchmark not implemented for task={task}, arch={arch}. "
             f"Add an exporter in src/exporters/ and a benchmark case in src/benchmark.py."
         )
 
