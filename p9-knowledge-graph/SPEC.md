@@ -12,10 +12,6 @@ This project builds a knowledge graph over structured domain data, exposes it vi
 SPARQL, and compares it against the vector-based retrieval in p7. The central
 question: when is a knowledge graph better than RAG, and when is it worse?
 
-This is directly relevant to production systems like Euro-BioImaging's AI4Access
-Research Navigator — where an LLM must reliably query a catalogue of hundreds of
-scientific services with structured attributes, capabilities, and constraints.
-
 ---
 
 ## Problem statement
@@ -27,12 +23,12 @@ Three problems:
    Knowledge graphs answer this precisely via SPARQL.
 
 2. **Ontology alignment is unsolved in most portfolios** — connecting domain data
-   to existing life science ontologies (EDAM, OBI, schema.org) makes data interoperable
-   with the broader semantic web ecosystem. Most ML engineers have never done this.
+   to existing life science ontologies (EDAM, OBI, schema.org) makes data
+   interoperable with the broader semantic web ecosystem.
 
 3. **GraphRAG is emerging** — combining knowledge graph traversal with vector
-   retrieval (GraphRAG) outperforms pure RAG on multi-hop questions. Building and
-   evaluating this combination is a differentiating skill.
+   retrieval outperforms pure RAG on multi-hop questions. Building and evaluating
+   this combination is a differentiating skill.
 
 ---
 
@@ -42,7 +38,7 @@ Three problems:
 
 A knowledge graph over two domains:
 
-**Life science services** (modelled after Euro-BioImaging):
+**Life science imaging services** (synthetic data modelled after public catalogues):
 - Imaging facilities with capabilities, locations, access conditions
 - Techniques (confocal, super-resolution, cryo-EM, etc.)
 - Sample types supported
@@ -60,14 +56,10 @@ Map the knowledge graph to existing ontologies:
 - **OBI** — biomedical investigations ontology
 - **schema.org** — for generic service descriptions
 
-This makes the graph interoperable — SPARQL queries can traverse both local
-and external linked data.
-
 ### 3. SPARQL endpoint
 
-Expose the knowledge graph via a SPARQL endpoint (Apache Jena Fuseki or
-equivalent). Implement example queries that demonstrate what graphs can answer
-that RAG cannot:
+Expose the knowledge graph via a SPARQL endpoint (Apache Jena Fuseki).
+Example queries that demonstrate what graphs can answer that RAG cannot:
 
 ```sparql
 # Which facilities support both super-resolution and cryo-EM and are in Sweden?
@@ -97,8 +89,8 @@ Extend the p7 evaluation framework to compare:
 - Pure SPARQL (structured queries only)
 - GraphRAG (combined)
 
-Metrics: faithfulness, answer relevance, and a new metric — **structural
-correctness** (does the answer accurately reflect the graph relationships?).
+Metrics: faithfulness, answer relevance, and **structural correctness** —
+does the answer accurately reflect the graph relationships?
 
 ---
 
@@ -120,7 +112,7 @@ p9-knowledge-graph/
 │   └── config.ttl          ← Apache Jena Fuseki configuration
 └── docs/
     ├── how-it-works.md
-    ├── ontology-design.md  ← design decisions for the graph schema
+    ├── ontology-design.md
     └── comparison.md       ← RAG vs SPARQL vs GraphRAG results
 ```
 
@@ -130,9 +122,9 @@ p9-knowledge-graph/
 
 - **RDF/OWL** — modelling domain knowledge formally with triples and ontologies
 - **SPARQL** — precise structured queries over a knowledge graph
-- **Ontology alignment** — connecting to EDAM, OBI — standard in life science informatics
-- **GraphRAG** — state-of-the-art hybrid retrieval combining graphs and vectors
-- **Comparative evaluation** — knowing when to use which approach is the senior skill
+- **Ontology alignment** — connecting to EDAM and OBI — standard in life science informatics
+- **GraphRAG** — hybrid retrieval combining graphs and vectors
+- **Comparative evaluation** — knowing when to use which approach
 
 ---
 
@@ -151,4 +143,3 @@ p9-knowledge-graph/
 - Training a custom embedding model for graph entities
 - Full production deployment of Fuseki (demo only)
 - Coverage of all life science ontologies (focus on EDAM + OBI)
-- Real Euro-BioImaging service data (synthetic data modelled after it)

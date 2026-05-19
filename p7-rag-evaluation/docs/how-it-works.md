@@ -3,6 +3,51 @@
 
 ---
 
+## What is RAG
+
+A large language model (LLM) knows what it learned during training. It cannot
+look things up, cannot cite sources, and cannot reason about documents it has
+never seen. Ask it about a paper published last month and it will either say it
+doesn't know or hallucinate a plausible-sounding answer.
+
+RAG (Retrieval-Augmented Generation) fixes this by splitting the problem in two:
+
+```
+User question
+      │
+      ▼
+  Retrieval — search a document store for relevant passages
+      │
+      ▼
+  Generation — LLM reads the question + retrieved passages → answers
+```
+
+The LLM is no longer expected to know the answer from memory. It is given the
+relevant text and asked to reason over it. This makes the answer grounded in
+real sources that can be cited and verified.
+
+**Three components:**
+
+1. **Document store** — a corpus of text split into chunks and indexed for search.
+   In p6/p7 this is PubMed abstracts and UniProt records stored in ChromaDB.
+
+2. **Retriever** — given a query, finds the most relevant chunks. The simplest
+   retriever is a vector search: encode the query and chunks as embeddings, return
+   the closest ones by cosine similarity.
+
+3. **Generator** — an LLM that reads the query and the retrieved chunks and
+   produces an answer. It is instructed to stay within what the chunks say.
+
+**What RAG does not solve:**
+- If the retriever returns the wrong chunks, the LLM answers the wrong question.
+- If the answer requires combining information across many documents, retrieval
+  may miss the pieces needed.
+- If the question is about structured relationships ("which X has both property Y
+  and property Z"), a vector search cannot answer it reliably — this is where
+  knowledge graphs (p9) are needed instead.
+
+---
+
 ## The problem with pure vector search
 
 A dense vector search encodes meaning. Given the query "TP53 glioblastoma", it
