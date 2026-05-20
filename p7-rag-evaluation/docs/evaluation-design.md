@@ -3,6 +3,52 @@
 
 ---
 
+## The history — from token overlap to LLM-as-judge
+
+Before LLMs were cheap enough to use as evaluators, NLP systems were scored
+by counting word overlap between the generated output and a reference answer.
+Two metrics dominated:
+
+**BLEU** (Bilingual Evaluation Understudy, 2002) — originally designed for
+machine translation. Counts how many n-grams (word sequences of length 1–4)
+from the generated translation appear in the human reference translation. Still
+reported in most translation benchmarks because it allows comparison with
+papers going back 20 years.
+
+**ROUGE** (Recall-Oriented Understudy for Gisting Evaluation, 2004) — designed
+for text summarisation. Counts overlapping words or phrases between a generated
+summary and a reference. ROUGE-1 counts single words; ROUGE-L counts the
+longest common subsequence.
+
+Both are fast, deterministic, and require no LLM. That was their appeal.
+
+**The problem:** they measure surface-level word similarity, not meaning.
+
+```
+Reference:  "The subject was deceased."
+Generated:  "The patient died."
+ROUGE score: 0   ← no words overlap
+```
+
+Both sentences say the same thing. ROUGE says the generated answer is completely
+wrong. This is not a corner case — in biomedical text, synonyms, abbreviations,
+and paraphrasing are the norm (TP53 / p53 / P04637 / tumour suppressor protein).
+
+A system that always uses the exact words of its training data scores high on
+BLEU/ROUGE. A system that paraphrases correctly scores low. BLEU/ROUGE reward
+memorisation, not understanding.
+
+**Why they are still used:** academic reproducibility. A BLEU score from 2024
+can be compared directly to a BLEU score from 2005. LLM-as-judge scores cannot
+be compared across papers because different judge models produce different scores.
+
+**Why p7 uses LLM-as-judge instead:** the task is not translation or
+summarisation — it is answering biomedical questions. Correctness requires
+understanding meaning, not counting words. LLM-as-judge is less reproducible
+across judge models but far more accurate at measuring what actually matters.
+
+---
+
 ## Why LLM-as-judge
 
 Evaluating a RAG system without labelled data requires an automated judge.
