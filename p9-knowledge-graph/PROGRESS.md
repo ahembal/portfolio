@@ -26,8 +26,8 @@
 | 9 | Helm chart | ✅ Done | `helm/` — Deployment with RGW initContainer (boto3), Service (NodePort 30900), PVC for TDB2. |
 | 9a | Builder Job | ✅ Done | `docker/` + `k8s/builder-job.yaml` + `cluster/manifests/p9-builder-job.yaml` — ArgoCD-managed Job that runs builder.py on quick-thrush and uploads graph.ttl to RGW. CI builds image via p9-build-image.yml. |
 | 9b | Cluster secrets | ✅ Done | `p9-rgw-credentials` created in default + knowledge-graph namespaces. `p9-builder-ssh-key` created (reuses p8 deploy key). |
-| 10 | Deploy Fuseki | ⬜ Todo | `helm upgrade --install p9 helm/ -n knowledge-graph` — after builder Job completes. |
-| 11 | Verify endpoint | ⬜ Todo | Run a test SPARQL query against the live NodePort 30900 endpoint. |
+| 10 | Deploy Fuseki | ✅ Done | Deployed in knowledge-graph namespace. NodePort 30900 on quick-thrush. 131,023 triples loaded. |
+| 11 | Verify endpoint | ✅ Done | `SELECT (COUNT(*) AS ?n) WHERE { ?s ?p ?o }` → 131023. Papers by TP53 query returns real results. |
 
 ## Phase 4 — SPARQL queries
 | # | Step | Status | What & Why |
@@ -63,7 +63,7 @@
 ```
 Phase 1  [████] 4/4 — Complete
 Phase 2  [███]  3/3 — Complete
-Phase 3  [████░░] 4/6 — Builder Job + secrets done; deploy + verify pending
+Phase 3  [██████] 6/6 ✅
 Phase 4  [███]  3/3 — Complete (sparql.py + 8 queries + 20 benchmark questions)
 Phase 5  [░░]   0/2 — Needs live Fuseki + p7 to run
 Phase 6  [░░]   0/2 — Planned (GraphRAG)

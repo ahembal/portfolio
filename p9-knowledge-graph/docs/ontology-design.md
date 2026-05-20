@@ -74,17 +74,17 @@ suitable ontology term exists.
 
 | Local class | Aligned to | Description |
 |-------------|-----------|-------------|
-| `p9:Paper` | `schema:ScholarlyArticle`, `edam:topic_0219` | A PubMed paper |
+| `p9:Paper` | `schema:ScholarlyArticle` | A PubMed paper |
 | `p9:Author` | `schema:Person` | A paper author |
-| `p9:Protein` | `edam:data_2976` | A UniProt protein record |
-| `p9:Gene` | `edam:topic_0078` | A gene |
-| `p9:Disease` | `edam:data_1150` | A disease (MeSH term) |
+| `p9:Protein` | `edam:data_0896` | A UniProt protein record ("Protein report") |
+| `p9:Gene` | *(local)* | A gene — no suitable EDAM class term exists |
+| `p9:Disease` | `edam:topic_0634` | A disease ("Pathology") |
 
 ### Properties
 
 | Local property | Aligned to | Domain | Range |
 |---------------|-----------|--------|-------|
-| `p9:pmid` | `edam:data_1771` | Paper | Literal |
+| `p9:pmid` | `schema:identifier` | Paper | Literal |
 | `p9:uniprot_id` | `schema:identifier` | Protein | Literal |
 | `p9:gene_symbol` | `schema:name` | Gene | Literal |
 | `p9:authored_by` | `schema:author` | Paper | Author |
