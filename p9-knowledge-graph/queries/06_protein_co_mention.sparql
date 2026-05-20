@@ -1,0 +1,14 @@
+-- Which proteins are co-mentioned with TP53 across the corpus?
+-- Three-hop self-join: protein ← paper → other_protein.
+-- This reveals implicit functional associations — proteins that tend
+-- to appear in the same literature as TP53.
+
+SELECT ?coProtein (COUNT(DISTINCT ?paper) AS ?coCount) WHERE {
+  ?paper  a           p9:Paper ;
+          p9:mentions uprot:P04637 ;   -- TP53
+          p9:mentions ?coProtein .
+  FILTER(?coProtein != uprot:P04637)
+}
+GROUP BY ?coProtein
+ORDER BY DESC(?coCount)
+LIMIT 15

@@ -1,0 +1,16 @@
+-- Multi-hop: paper → protein → disease.
+-- Given a paper title fragment, find all diseases reachable through
+-- the proteins the paper cites.
+-- RAG cannot do this: it retrieves documents, not relationship paths.
+
+SELECT DISTINCT ?paper ?title ?protein ?disease WHERE {
+  ?paper   a              p9:Paper ;
+           schema:name    ?title ;
+           p9:mentions    ?protein .
+  ?protein up:annotation  ?ann .
+  ?ann     a              up:Disease_Annotation ;
+           up:disease      ?diseaseRef .
+  ?diseaseRef rdfs:label  ?disease .
+  FILTER(CONTAINS(LCASE(?title), "glioblastoma"))
+}
+ORDER BY ?disease

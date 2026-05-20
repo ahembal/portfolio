@@ -1,0 +1,10 @@
+-- Aggregation: which proteins appear in the most papers?
+-- RAG has no aggregation mechanism — it cannot count mentions across a corpus.
+
+SELECT ?protein (COUNT(DISTINCT ?paper) AS ?paperCount) WHERE {
+  ?paper a p9:Paper ;
+         p9:mentions ?protein .
+}
+GROUP BY ?protein
+ORDER BY DESC(?paperCount)
+LIMIT 10

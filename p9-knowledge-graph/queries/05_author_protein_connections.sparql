@@ -1,0 +1,13 @@
+-- Multi-hop: which authors have published papers mentioning a given protein?
+-- Two hops: author ← paper → protein.
+-- Enables "find collaborators who work on KRAS" queries — impossible via RAG.
+
+SELECT ?author ?authorName (COUNT(DISTINCT ?paper) AS ?paperCount) WHERE {
+  ?paper  a            p9:Paper ;
+          schema:author ?author ;
+          p9:mentions   uprot:P01116 .   -- KRAS
+  ?author schema:name  ?authorName .
+}
+GROUP BY ?author ?authorName
+ORDER BY DESC(?paperCount)
+LIMIT 20

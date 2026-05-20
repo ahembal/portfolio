@@ -1,0 +1,13 @@
+-- Set intersection: papers that mention both TP53 and BRCA1.
+-- This is an exact relational join across two triple patterns.
+-- RAG would retrieve documents about TP53 or BRCA1 separately,
+-- with no guarantee both appear in the same retrieved chunk.
+
+SELECT ?paper ?title ?year WHERE {
+  ?paper a p9:Paper ;
+         schema:name          ?title ;
+         schema:datePublished ?year ;
+         p9:mentions          uprot:P04637 ;   -- TP53
+         p9:mentions          uprot:P38398 .   -- BRCA1
+}
+ORDER BY DESC(?year)

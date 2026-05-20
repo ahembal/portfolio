@@ -1,0 +1,13 @@
+-- Temporal + topic filter: papers on oncology published after 2015.
+-- Uses the EDAM alignment added by aligner.py.
+-- RAG has no structured date filter — date filtering requires metadata
+-- handling outside the retrieval step.
+
+SELECT ?paper ?title ?year WHERE {
+  ?paper a p9:Paper ;
+         schema:name          ?title ;
+         schema:datePublished ?year ;
+         edam:has_topic       edam:topic_2640 .   -- Oncology (EDAM)
+  FILTER(xsd:integer(?year) > 2015)
+}
+ORDER BY DESC(?year)

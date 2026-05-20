@@ -1,0 +1,17 @@
+-- Full protein-disease subgraph: all proteins in the graph that have
+-- a disease annotation, with the disease label and the papers that
+-- cite those proteins.
+-- Returns the structured disease-protein-paper lattice in one query.
+-- This is the canonical demo of what SPARQL can do that RAG cannot:
+-- enumerate a complete structured subgraph.
+
+SELECT DISTINCT ?protein ?disease ?paper ?title WHERE {
+  ?paper   a              p9:Paper ;
+           schema:name    ?title ;
+           p9:mentions    ?protein .
+  ?protein up:annotation  ?ann .
+  ?ann     a              up:Disease_Annotation ;
+           up:disease      ?diseaseRef .
+  ?diseaseRef rdfs:label  ?disease .
+}
+ORDER BY ?disease ?protein

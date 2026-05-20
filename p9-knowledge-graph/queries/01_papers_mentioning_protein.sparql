@@ -1,0 +1,11 @@
+-- All papers that mention a given protein (parameterise ?targetProtein).
+-- RAG equivalent: keyword search for "TP53" — finds semantically similar
+-- documents but cannot guarantee the protein is explicitly referenced.
+
+SELECT ?paper ?title ?year WHERE {
+  ?paper a p9:Paper ;
+         schema:name          ?title ;
+         schema:datePublished ?year ;
+         p9:mentions          uprot:P04637 .   -- TP53
+}
+ORDER BY DESC(?year)
