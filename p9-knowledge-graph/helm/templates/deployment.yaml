@@ -6,6 +6,14 @@ metadata:
     app: {{ include "p9-fuseki.fullname" . }}
 spec:
   replicas: 1
+  # Recreate kills the old pod before starting the new one.
+  # Required because TDB2 uses an exclusive file lock — two Fuseki instances
+  # sharing the same PVC would deadlock. RollingUpdate (the default) causes
+  # the new pod to fail with "Failed to get a lock: tdb.lock held by process N".
+  # Production note: for zero-downtime upgrades, migrate to a StatefulSet with
+  # application-level HA. See docs/security.md — production readiness section.
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: {{ include "p9-fuseki.fullname" . }}
@@ -14,6 +22,9 @@ spec:
       labels:
         app: {{ include "p9-fuseki.fullname" . }}
     spec:
+      securityContext:
+        fsGroup: 101
+
       initContainers:
         - name: load-graph
           image: python:3.12-slim
@@ -64,8 +75,6 @@ spec:
         - name: fuseki
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          args:
-            - --config=/fuseki/config/config.ttl
           env:
             - name: ADMIN_PASSWORD
               value: "{{ .Values.adminPassword }}"
@@ -75,7 +84,8 @@ spec:
             - containerPort: 3030
           volumeMounts:
             - name: fuseki-config
-              mountPath: /fuseki/config
+              mountPath: /fuseki/config.ttl
+              subPath: config.ttl
             - name: tdb2-storage
               mountPath: /fuseki/databases
             - name: graph-data

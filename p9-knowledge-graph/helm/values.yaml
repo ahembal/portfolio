@@ -1,6 +1,6 @@
 image:
-  repository: apache/jena-fuseki
-  tag: "4.10.0"
+  repository: stain/jena-fuseki
+  tag: "4.8.0"
   pullPolicy: IfNotPresent
 
 service:
