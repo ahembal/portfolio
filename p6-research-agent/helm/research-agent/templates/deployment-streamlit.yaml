@@ -13,6 +13,8 @@ spec:
       labels:
         app: research-agent-streamlit
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: quick-thrush
       imagePullSecrets:
         - name: ghcr-pull-secret
       securityContext:

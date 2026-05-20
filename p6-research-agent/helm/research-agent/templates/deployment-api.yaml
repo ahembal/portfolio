@@ -13,6 +13,8 @@ spec:
       labels:
         app: research-agent-api
     spec:
+      nodeSelector:
+        kubernetes.io/hostname: quick-thrush
       imagePullSecrets:
         - name: ghcr-pull-secret
       securityContext:

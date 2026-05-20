@@ -64,6 +64,11 @@ grafana:
   enabled: true
   adminPassword: "homelab"   # local-only — not exposed externally
   nodeSelector: *nodeSelector
+  # Telemetry opt-out — see p5-devpractices-site/docs/privacy.md
+  grafana.ini:
+    analytics:
+      reporting_enabled: false
+      check_for_updates: false
 
   resources:
     requests:

@@ -16,3 +16,7 @@ data:
   TRANSFORMERS_CACHE: "/tmp/hf_cache"
   STREAMLIT_HOME: "/tmp"
   HOME: "/tmp"
+  # Telemetry opt-out — see p5-devpractices-site/docs/privacy.md
+  ANONYMIZED_TELEMETRY: "False"
+  STREAMLIT_BROWSER_GATHER_USAGE_STATS: "false"
+  HF_HUB_DISABLE_TELEMETRY: "1"
