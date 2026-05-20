@@ -169,3 +169,27 @@ PermissionError: [Errno 13] Permission denied: '/.streamlit'
 **Root cause:** Streamlit writes an installation ID and credentials cache to `$HOME/.streamlit/` at startup. With `HOME` unset and running as UID 1000, it falls back to `/` and fails to create `/.streamlit/`.
 
 **Fix:** Added `HOME=/tmp` to the ConfigMap. Streamlit then writes to `/tmp/.streamlit/` which is writable by any user.
+
+---
+
+## 11. OOMKilled during corpus ingestion
+
+**Symptom:** Running corpus ingestion (embedding ~200 PubMed abstracts) inside the
+research-agent-api pod crashes with exit code 137 (SIGKILL / OOM):
+
+```
+command terminated with exit code 137
+```
+
+**Root cause:** The initial memory limit was `1Gi` — set conservatively before
+the ingestion workload was known. The sentence-transformer model alone takes
+~400-500MB. Embedding 200 documents in one pass peaks at ~2-3GB, exceeding the
+limit and triggering the OOM killer.
+
+**Fix:** Increased memory limit to `8Gi` in `helm/research-agent/values.yaml`.
+The request stays at `1Gi` (normal operation is lighter). quick-thrush has 64GB
+RAM and Ollama already reserves 20GB, so 8Gi for the API is not wasteful.
+
+**Why 8Gi:** model (~500MB) + app (~200MB) + ChromaDB (~100MB) + embedding batch
+peak (~2-3GB) + safety margin = ~4GB needed. 8Gi gives 2× headroom for larger
+future ingestion runs without hitting the limit again.
