@@ -1,0 +1,27 @@
+id: resnet18-tiatoolbox-pcam-v1-2026-05-20
+model_id: resnet18-tiatoolbox-pcam
+model_version: v1
+date: '2026-05-20'
+hardware: p8-benchmark-resnet18-tiatoolbox-pcam-v1-2-qbcvs
+n_runs: 100
+warmup_runs: 10
+pytorch:
+  p50_ms: 14.27
+  p95_ms: 102.92
+  p99_ms: 198.36
+  memory_mb: 16.73
+onnx:
+  p50_ms: 39.52
+  p95_ms: 100.08
+  p99_ms: 105.19
+  memory_mb: 0.71
+output_agreement:
+  max_abs_diff: 2.86e-06
+  tolerance: 0.0001
+  passed: true
+speedup:
+  p50: 0.36x
+  p95: 1.03x
+  p99: 1.89x
+verdict: "\u2014 Marginal gain (p50=0.36x p95=1.03x p99=1.89x mean=1.09x), review\
+  \ before switching"
