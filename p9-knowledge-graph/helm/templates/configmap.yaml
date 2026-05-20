@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "p9-fuseki.fullname" . }}-config
+  labels:
+    app: {{ include "p9-fuseki.fullname" . }}
+data:
+  config.ttl: |
+    @prefix fuseki:  <http://jena.apache.org/fuseki#> .
+    @prefix rdf:     <http://www.w3.org/1999/02/22-rdf-syntax-ns#> .
+    @prefix rdfs:    <http://www.w3.org/2000/01/rdf-schema#> .
+    @prefix ja:      <http://jena.hpl.hp.com/2005/11/Assembler#> .
+    @prefix tdb2:    <http://jena.apache.org/2016/tdb#> .
+    @prefix :        <#> .
+
+    [] rdf:type fuseki:Server ;
+       fuseki:services ( :p9 ) .
+
+    :p9 rdf:type fuseki:Service ;
+        rdfs:label "p9 knowledge graph" ;
+        fuseki:name "p9" ;
+        fuseki:endpoint [ fuseki:operation fuseki:query  ; fuseki:name "sparql" ] ;
+        fuseki:endpoint [ fuseki:operation fuseki:query  ; fuseki:name "query"  ] ;
+        fuseki:endpoint [ fuseki:operation fuseki:update ; fuseki:name "update" ] ;
+        fuseki:endpoint [ fuseki:operation fuseki:gsp-rw ; fuseki:name "data"   ] ;
+        fuseki:endpoint [ fuseki:operation fuseki:gsp-r  ; fuseki:name "get"    ] ;
+        fuseki:dataset :dataset .
+
+    :dataset rdf:type tdb2:DatasetTDB2 ;
+        tdb2:location "/fuseki/databases/p9" .

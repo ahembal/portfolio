@@ -1,0 +1,6 @@
+apiVersion: v2
+name: p9-fuseki
+description: Apache Jena Fuseki SPARQL endpoint for the p9 knowledge graph
+type: application
+version: 0.1.0
+appVersion: "4.10.0"

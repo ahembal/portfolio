@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "p9-fuseki.fullname" . }}
+  labels:
+    app: {{ include "p9-fuseki.fullname" . }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ include "p9-fuseki.fullname" . }}
+  template:
+    metadata:
+      labels:
+        app: {{ include "p9-fuseki.fullname" . }}
+    spec:
+      initContainers:
+        - name: load-graph
+          image: python:3.12-slim
+          command:
+            - sh
+            - -c
+            - |
+              pip install boto3 -q
+              python3 - <<'EOF'
+              import boto3, os
+              s3 = boto3.client(
+                  "s3",
+                  endpoint_url=os.environ["RGW_ENDPOINT"],
+                  aws_access_key_id=os.environ["RGW_ACCESS_KEY"],
+                  aws_secret_access_key=os.environ["RGW_SECRET_KEY"],
+              )
+              bucket = os.environ.get("RGW_BUCKET", "p9-graph")
+              key    = os.environ.get("RGW_KEY",    "graph.ttl")
+              s3.download_file(bucket, key, "/data/graph.ttl")
+              size = os.path.getsize("/data/graph.ttl")
+              print(f"Downloaded s3://{bucket}/{key} ({size} bytes)")
+              EOF
+          env:
+            - name: RGW_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: p9-rgw-credentials
+                  key: endpoint
+            - name: RGW_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: p9-rgw-credentials
+                  key: access-key
+            - name: RGW_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: p9-rgw-credentials
+                  key: secret-key
+            - name: RGW_BUCKET
+              value: {{ .Values.rgw.bucket | quote }}
+            - name: RGW_KEY
+              value: {{ .Values.rgw.key | quote }}
+          volumeMounts:
+            - name: graph-data
+              mountPath: /data
+
+      containers:
+        - name: fuseki
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          args:
+            - --config=/fuseki/config/config.ttl
+          env:
+            - name: ADMIN_PASSWORD
+              value: "{{ .Values.adminPassword }}"
+            - name: JVM_ARGS
+              value: "-Xmx1g"
+          ports:
+            - containerPort: 3030
+          volumeMounts:
+            - name: fuseki-config
+              mountPath: /fuseki/config
+            - name: tdb2-storage
+              mountPath: /fuseki/databases
+            - name: graph-data
+              mountPath: /data
+          lifecycle:
+            postStart:
+              exec:
+                command:
+                  - sh
+                  - -c
+                  - |
+                    for i in $(seq 1 20); do
+                      sleep 3
+                      curl -sf http://localhost:3030/p9/data \
+                        -H "Content-Type: text/turtle" \
+                        --data-binary @/data/graph.ttl \
+                        -u "admin:{{ .Values.adminPassword }}" && break
+                      echo "retry $i"
+                    done
+          readinessProbe:
+            httpGet:
+              path: /$/ping
+              port: 3030
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+
+      volumes:
+        - name: fuseki-config
+          configMap:
+            name: {{ include "p9-fuseki.fullname" . }}-config
+        - name: tdb2-storage
+          persistentVolumeClaim:
+            claimName: {{ include "p9-fuseki.fullname" . }}-tdb2
+        - name: graph-data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "p9-fuseki.fullname" . }}-tdb2
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size }}
+  {{- if .Values.persistence.storageClass }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+  {{- end }}

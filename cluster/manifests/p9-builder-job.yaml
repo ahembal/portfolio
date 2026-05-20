@@ -1,0 +1,49 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: p9-graph-builder-1
+  namespace: default
+spec:
+  ttlSecondsAfterFinished: 3600
+  template:
+    spec:
+      nodeSelector:
+        kubernetes.io/hostname: quick-thrush
+      restartPolicy: Never
+      imagePullSecrets:
+        - name: ghcr-pull-secret
+      containers:
+        - name: builder
+          image: ghcr.io/ahembal/p9-graph-builder:latest
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+            limits:
+              cpu: "2000m"
+              memory: "2Gi"
+          env:
+            - name: RGW_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: p9-rgw-credentials
+                  key: endpoint
+            - name: RGW_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: p9-rgw-credentials
+                  key: access-key
+            - name: RGW_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: p9-rgw-credentials
+                  key: secret-key
+          volumeMounts:
+            - name: ssh-key
+              mountPath: /secrets
+              readOnly: true
+      volumes:
+        - name: ssh-key
+          secret:
+            secretName: p9-builder-ssh-key
+            defaultMode: 0600
