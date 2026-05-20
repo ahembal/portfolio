@@ -5,100 +5,21 @@
 
 ## Background concepts
 
-### RDF
+p9 is built on RDF, SPARQL, and the open linked data ecosystem. These concepts
+are covered in depth in `docs/rdf-linked-data.md`. Brief summary:
 
-RDF (Resource Description Framework) is a standard for representing facts as
-triples. Defined by the W3C in 1999, standardised as RDF 1.1 in 2014. It was
-originally designed to make the web machine-readable — Tim Berners-Lee's vision
-of a "Semantic Web" where data, not just pages, could be linked and queried
-across institutions.
-
-Every fact in RDF has exactly this structure:
-
-```
-subject  →  predicate  →  object
-```
-
-Always triples — that is the fundamental constraint. A knowledge graph is a
-large collection of these triples.
-
-RDF is used in production by Wikidata (billions of triples from Wikipedia),
-UniProt (all protein data), EBI (Ensembl, ChEMBL), Schema.org (structured data
-in Google/Bing search results), and national libraries worldwide. In life science
-it became standard infrastructure because datasets — genes, proteins, diseases,
-compounds — naturally connect across institutional boundaries, and RDF's identity
-model makes those connections explicit without requiring a central database.
-
-### URI
-
-URI (Uniform Resource Identifier) is a string that uniquely identifies a thing.
-A URL is a type of URI — one you can fetch from. In RDF, URIs identify concepts,
-not just web pages: things, relationships, properties.
-
-```
-https://www.wikidata.org/entity/Q7186    ← Marie Curie
-https://www.wikidata.org/prop/P166       ← "award" relationship
-https://www.wikidata.org/entity/Q37922   ← Nobel Prize in Physics
-```
-
-The key property is **global uniqueness**: if two datasets both use the same URI
-for "Nobel Prize in Physics", they are talking about the same thing and can be
-joined in a single query — no schema mapping, no ETL. This is what makes
-ontology alignment practical.
-
-In Turtle files URIs are shortened with prefixes:
-```turtle
-wd:Q7186  wdt:P166  wd:Q37922 .
-# expands to:
-# <https://www.wikidata.org/entity/Q7186>
-#   <https://www.wikidata.org/prop/P166>
-#   <https://www.wikidata.org/entity/Q37922> .
-```
-
-### Real Wikidata triples — Marie Curie
-
-```turtle
-wd:Q7186  wdt:P31   wd:Q5        # Marie Curie  instance-of     human
-wd:Q7186  wdt:P21   wd:Q6581072  # Marie Curie  sex-or-gender   female
-wd:Q7186  wdt:P27   wd:Q142      # Marie Curie  country         France
-wd:Q7186  wdt:P27   wd:Q36       # Marie Curie  country         Poland
-wd:Q7186  wdt:P166  wd:Q37922    # Marie Curie  award           Nobel Prize in Physics
-wd:Q7186  wdt:P166  wd:Q11047    # Marie Curie  award           Nobel Prize in Chemistry
-wd:Q7186  wdt:P569  "1867-11-07" # Marie Curie  date-of-birth   1867-11-07
-```
-
-Notice that "female", "France", and "Nobel Prize in Physics" are all URIs —
-nodes in the graph with their own triples. Everything is a node or a literal.
-
-A SPARQL query over this graph — all women who won the Nobel Prize in Physics:
-```sparql
-SELECT ?person ?personLabel WHERE {
-  ?person wdt:P166 wd:Q37922 .    # won Nobel Prize in Physics
-  ?person wdt:P21  wd:Q6581072 .  # and is female
-}
-```
-
-Wikidata's public SPARQL endpoint answers this across billions of triples in
-milliseconds. p9 uses the same model at a smaller scale.
-
-### SPARQL
-
-SPARQL (SPARQL Protocol and RDF Query Language) is to RDF what SQL is to
-relational databases. W3C standard since 2008 (SPARQL 1.1 in 2013).
-
-It works by specifying a pattern of triples with variables, and asking the graph
-to find all assignments of those variables that match:
-
-```sparql
-SELECT ?paper ?disease WHERE {
-  ?paper   p9:mentions        ?protein .  # paper mentions some protein
-  ?protein p9:associated_with ?disease .  # that protein is associated with a disease
-}
-```
-
-The graph engine finds every combination of `?paper`, `?protein`, `?disease`
-where both triples exist. This is a two-hop traversal — something a vector store
-cannot do reliably.
+- **RDF** — every fact is a triple: subject → predicate → object. A knowledge
+  graph is a collection of triples.
+- **URI** — every node and predicate is a globally unique identifier. Two
+  datasets using the same URI for the same thing can be queried together without
+  any schema mapping.
+- **Turtle (.ttl)** — the human-readable file format for writing RDF triples.
+  Fuseki loads Turtle directly.
+- **SPARQL** — the query language for RDF graphs. Specifies triple patterns
+  with variables; the engine finds all matching assignments.
+- **Open linked data** — UniProt, Wikidata, EBI, and others publish their data
+  as RDF with public SPARQL endpoints. p9 connects into this ecosystem by
+  referencing UniProt URIs directly in its paper triples.
 
 ---
 

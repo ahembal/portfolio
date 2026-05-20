@@ -97,22 +97,74 @@ many sources — exactly what RAG with a generative LLM does well.
 
 ---
 
+## Benchmark design
+
+The benchmark (`src/benchmark.py`) contains 20 questions split into two groups.
+
+### Structured questions — 10 (SPARQL favoured)
+
+Questions that require exact set operations, counting, or multi-hop graph
+traversal. SPARQL answers are deterministic and treated as ground truth. RAG
+answers are scored against the SPARQL result.
+
+| # | Question | Requires |
+|---|----------|----------|
+| 1 | How many papers mention TP53? | COUNT aggregation |
+| 2 | Which papers mention both TP53 and BRCA1? | Set intersection (JOIN) |
+| 3 | Which proteins appear in more than 5 papers? | Aggregation + HAVING |
+| 4 | Which EGFR papers were published after 2018? | Filter + date comparison |
+| 5 | Which proteins are co-mentioned with TP53 in ≥3 papers? | Self-join + HAVING |
+| 6 | Which authors published papers mentioning KRAS? | 2-hop traversal |
+| 7 | Diseases linked to proteins in BRCA1 papers? | 3-hop traversal |
+| 8 | Which paper mentions the most distinct proteins? | Aggregation + ORDER BY |
+| 9 | Which papers are tagged with the oncology EDAM topic? | EDAM alignment query |
+| 10 | Which papers mention both MDM2 and TP53? | Set intersection |
+
+### Open-ended questions — 10 (RAG favoured)
+
+Questions requiring synthesis, explanation, or analogical reasoning over
+unstructured text. SPARQL is not applicable; recorded as N/A.
+
+| # | Question |
+|---|----------|
+| 1 | Role of TP53 in the DNA damage response |
+| 2 | How BRCA1 contributes to tumour suppression |
+| 3 | Mechanisms by which EGFR drives cancer progression |
+| 4 | How PTEN loss affects cancer cell survival |
+| 5 | Relationship between MDM2 and TP53, and therapeutic exploitation |
+| 6 | How ATM functions as a DNA damage sensor |
+| 7 | Cancer types associated with KRAS mutations and why |
+| 8 | Therapeutic strategies for BRCA1/2-deficient tumours |
+| 9 | How EGFR signalling differs between lung and colorectal cancer |
+| 10 | Clinical significance of RB1 loss in cancer |
+
+### Scoring
+
+- **Correctness** — is the answer factually right? (1.0 = fully correct)
+- **Completeness** — does it cover all relevant facts? (1.0 = all facts present)
+- **Hallucination** — does it state things not in the source data? (0.0 = none)
+
+For structured questions: SPARQL result = ground truth (score 1.0 automatically).
+RAG correctness is measured by entity overlap with the SPARQL result.
+
+For open-ended questions: RAG answer is scored against the reference text in
+`src/benchmark.py` using an LLM judge (or token-overlap heuristic).
+
 ## Benchmark results
 
-*To be filled in after running the comparison on the seed dataset.*
+*Run `python scripts/run_comparison.py` after deploying Fuseki and starting p7.*
 
-The benchmark uses 20 questions: 10 structured (favour SPARQL) and 10
-open-ended (favour RAG). Each question is answered by both systems and scored
-on:
-- **Correctness** — is the answer factually right?
-- **Completeness** — does it cover all the relevant facts?
-- **Hallucination rate** — does it state things not in the source data?
+```
+python scripts/run_comparison.py
+# Results written to results/comparison_<timestamp>.json
+# Copy markdown table to this file.
+```
 
 | Question type | System | Correctness | Completeness | Hallucination |
 |--------------|--------|------------|-------------|--------------|
 | Structured (set intersection, counting) | SPARQL | — | — | — |
 | Structured (set intersection, counting) | RAG | — | — | — |
-| Open-ended (explanation, synthesis) | SPARQL | — | — | — |
+| Open-ended (explanation, synthesis) | SPARQL | N/A | N/A | N/A |
 | Open-ended (explanation, synthesis) | RAG | — | — | — |
 
 ---

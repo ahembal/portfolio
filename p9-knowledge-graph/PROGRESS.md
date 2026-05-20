@@ -1,42 +1,45 @@
 # Project 9 — Knowledge Graph & Semantic Search
 ## Progress Tracker
-*Last updated: 2026-05-19*
+*Last updated: 2026-05-20*
 
 ---
 
 ## Phase 1 — Graph schema and seed data
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 1 | RDF schema definition | ⬜ Todo | Define classes and properties in Turtle. Establish local namespace and EDAM/OBI alignment mappings. |
-| 2 | PubMed seed data | ⬜ Todo | Fetch ~500 papers across 5 topics (TP53, BRCA1, EGFR, p53 cancer, DNA repair). Extract entities and relationships. |
-| 3 | UniProt seed data | ⬜ Todo | Fetch canonical records for proteins mentioned in seed papers. Extract accessions, gene symbols, disease associations. |
-| 4 | Serialise to Turtle | ⬜ Todo | Produce `data/seed/graph.ttl` — the fixed snapshot used for benchmarking. |
+| 1 | RDF schema definition | ✅ Done | Namespaces and classes defined in builder.py (P9, SCH, EDAM, UP). Paper, Author, Protein, Disease. |
+| 2 | PubMed seed data | ✅ Done | builder.py fetches papers via UniProt-inverted citations — no NLP, deterministic. |
+| 3 | UniProt seed data | ✅ Done | 10 canonical proteins (TP53, BRCA1, EGFR, BRCA2, PTEN, MDM2, ATM, KRAS, RB1, APC). Full native Turtle merged. |
+| 4 | Serialise to Turtle | ✅ Done | `python src/builder.py` produces `data/seed/graph.ttl`. Run once to generate seed file. |
 
 ## Phase 2 — RDF builder
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 5 | builder.py | ⬜ Todo | Python script using rdflib. Fetches from PubMed and UniProt, constructs graph, serialises to Turtle. |
-| 6 | aligner.py | ⬜ Todo | Maps local entity types to EDAM and OBI terms. Adds aligned triples to the graph. |
-| 7 | Validation | ⬜ Todo | Assert graph is well-formed: no dangling references, all required properties present. |
+| 5 | builder.py | ✅ Done | UniProt-inverted citation strategy. Fetches protein RDF, extracts PMIDs, adds p9:mentions edges. |
+| 6 | aligner.py | ✅ Done | Keyword-based EDAM topic alignment for papers; data type alignment for proteins and diseases. |
+| 7 | Validation | ✅ Done | `validate()` in builder.py — checks pmid, schema:name, and that mentions targets have rdf:type. |
 
 ## Phase 3 — Fuseki deployment
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 8 | Fuseki config | ⬜ Todo | `fuseki/config.ttl` — dataset name, update endpoint, query endpoint. |
-| 9 | Helm chart | ⬜ Todo | Deploy Fuseki on quick-thrush. NodePort 30900. Load graph.ttl on startup. |
-| 10 | Verify endpoint | ⬜ Todo | Run a test SPARQL query against the live cluster endpoint. |
+| 8 | Fuseki config | ✅ Done | `fuseki/config.ttl` — TDB2 dataset, /p9 service, query/update/gsp endpoints. |
+| 9 | Helm chart | ✅ Done | `helm/` — Deployment with RGW initContainer (boto3), Service (NodePort 30900), PVC for TDB2. |
+| 9a | Builder Job | ✅ Done | `docker/` + `k8s/builder-job.yaml` + `cluster/manifests/p9-builder-job.yaml` — ArgoCD-managed Job that runs builder.py on quick-thrush and uploads graph.ttl to RGW. CI builds image via p9-build-image.yml. |
+| 9b | Cluster secrets | ✅ Done | `p9-rgw-credentials` created in default + knowledge-graph namespaces. `p9-builder-ssh-key` created (reuses p8 deploy key). |
+| 10 | Deploy Fuseki | ⬜ Todo | `helm upgrade --install p9 helm/ -n knowledge-graph` — after builder Job completes. |
+| 11 | Verify endpoint | ⬜ Todo | Run a test SPARQL query against the live NodePort 30900 endpoint. |
 
 ## Phase 4 — SPARQL queries
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 11 | sparql.py | ⬜ Todo | Python query interface over Fuseki HTTP endpoint. Used by comparison framework. |
-| 12 | Example queries | ⬜ Todo | 8–10 SPARQL queries in `queries/` demonstrating multi-hop reasoning RAG cannot do. |
-| 13 | Benchmark questions | ⬜ Todo | 20 questions (10 structured, 10 open-ended) with ground truth for RAG vs SPARQL comparison. |
+| 11 | sparql.py | ✅ Done | SPARQLClient wrapping SPARQLWrapper. Standard prefix injection. query() and ask() methods. |
+| 12 | Example queries | ✅ Done | 8 queries in `queries/` — papers by protein, disease paths, top proteins, set intersection, author links, co-mention, temporal filter, full disease subgraph. |
+| 13 | Benchmark questions | ✅ Done | `src/benchmark.py` — 10 structured (SPARQL favoured) + 10 open-ended (RAG favoured), each with inline SPARQL and reference answer. |
 
 ## Phase 5 — RAG vs SPARQL comparison
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 14 | Run benchmark | ⬜ Todo | Run all 20 questions through SPARQL (p9) and RAG (p7). Record correctness, completeness, hallucination. |
+| 14 | Run benchmark | ⬜ Todo | `python scripts/run_comparison.py` — needs live Fuseki + p7. Writes results/ and markdown table. |
 | 15 | Fill comparison.md | ⬜ Todo | Add benchmark results table to `docs/comparison.md`. |
 
 ## Phase 6 — GraphRAG (planned)
@@ -48,21 +51,45 @@
 ## Phase 7 — Imaging facilities domain (planned)
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 18 | Schema extension | ⬜ Planned | Add Facility, Technique, SampleType, AccessCondition classes. Once the system exists, adding a second domain is straightforward. |
-| 19 | Seed data | ⬜ Planned | Synthetic imaging facility data modelled after public catalogues. 15–20 facilities with techniques, locations, access conditions. |
-| 20 | EDAM alignment | ⬜ Planned | Map imaging techniques to EDAM operation terms (e.g. edam:operation_3443 — Image analysis). |
-| 21 | SPARQL examples | ⬜ Planned | Multi-hop queries: facilities supporting multiple techniques, filtering by location and access type. |
+| 18 | Schema extension | ⬜ Planned | Add Facility, Technique, SampleType, AccessCondition classes. |
+| 19 | Seed data | ⬜ Planned | Synthetic imaging facility data. 15–20 facilities. |
+| 20 | EDAM alignment | ⬜ Planned | Map imaging techniques to EDAM operation terms. |
+| 21 | SPARQL examples | ⬜ Planned | Multi-hop queries across facility/technique/access graph. |
 
 ---
 
 ## Quick status
 
 ```
-Phase 1  [░░░░] 0/4 — Not started
-Phase 2  [░░░]  0/3 — Not started
-Phase 3  [░░░]  0/3 — Not started
-Phase 4  [░░░]  0/3 — Not started
-Phase 5  [░░]   0/2 — Not started
+Phase 1  [████] 4/4 — Complete
+Phase 2  [███]  3/3 — Complete
+Phase 3  [████░░] 4/6 — Builder Job + secrets done; deploy + verify pending
+Phase 4  [███]  3/3 — Complete (sparql.py + 8 queries + 20 benchmark questions)
+Phase 5  [░░]   0/2 — Needs live Fuseki + p7 to run
 Phase 6  [░░]   0/2 — Planned (GraphRAG)
 Phase 7  [░░░░] 0/4 — Planned (Imaging facilities)
+```
+
+## How to run
+
+```bash
+# 1. Install dependencies
+pip install -r requirements.txt
+
+# 2. Build the knowledge graph (takes ~5–10 min, hits PubMed + UniProt)
+python src/builder.py
+
+# 3. Deploy Fuseki on the cluster
+helm upgrade --install p9 helm/ \
+  --set graphTtlUrl=<URL-to-graph.ttl>
+
+# 4. Query via Python
+export P9_SPARQL_ENDPOINT=http://<node-ip>:30900/p9/sparql
+python - <<'EOF'
+from src.sparql import SPARQLClient
+client = SPARQLClient()
+rows = client.query(open("queries/03_top_proteins_by_paper_count.sparql").read())
+for r in rows[:5]:
+    print(r)
+EOF
 ```

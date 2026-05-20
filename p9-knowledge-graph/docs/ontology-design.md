@@ -31,14 +31,15 @@ Relevant branches used in p9:
 
 | EDAM concept | URI | Used for |
 |-------------|-----|---------|
-| `topic_0219` | Publication | Classifying papers |
-| `topic_0078` | Proteins | Protein entities |
 | `topic_2640` | Oncology | Cancer-related papers |
-| `topic_0625` | Genotype and phenotype | Disease-gene associations |
-| `data_1771` | PMID | PubMed identifier |
-| `data_2976` | Protein sequence | UniProt protein records |
-| `data_1150` | Disease ID | MeSH disease identifiers |
+| `topic_0634` | Pathology | Disease entities |
+| `topic_0622` | Genomics | Genomics papers |
+| `topic_0602` | Molecular interactions, pathways and networks | Signalling pathway papers |
+| `data_0896` | Protein report | UniProt protein records |
 | `operation_0224` | Query and retrieval | SPARQL query operations |
+
+Note: EDAM has no term for PubMed identifier (PMID). PMIDs are typed using
+`schema:identifier` instead.
 
 ### OBI
 
