@@ -9,8 +9,7 @@ SELECT DISTINCT ?paper ?title ?protein ?disease WHERE {
            p9:mentions    ?protein .
   ?protein up:annotation  ?ann .
   ?ann     a              up:Disease_Annotation ;
-           up:disease      ?diseaseRef .
-  ?diseaseRef rdfs:label  ?disease .
+           rdfs:comment    ?disease .
   FILTER(CONTAINS(LCASE(?title), "glioblastoma"))
 }
 ORDER BY ?disease

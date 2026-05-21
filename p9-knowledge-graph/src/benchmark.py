@@ -127,8 +127,7 @@ SELECT DISTINCT ?disease WHERE {
             p9:mentions    ?protein .
   ?protein  up:annotation  ?ann .
   ?ann      a              up:Disease_Annotation ;
-            up:disease     ?diseaseRef .
-  ?diseaseRef rdfs:label   ?disease .
+            rdfs:comment   ?disease .
   FILTER(?protein != uprot:P38398)
 }
 ORDER BY ?disease""",

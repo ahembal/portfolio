@@ -11,7 +11,6 @@ SELECT DISTINCT ?protein ?disease ?paper ?title WHERE {
            p9:mentions    ?protein .
   ?protein up:annotation  ?ann .
   ?ann     a              up:Disease_Annotation ;
-           up:disease      ?diseaseRef .
-  ?diseaseRef rdfs:label  ?disease .
+           rdfs:comment    ?disease .
 }
 ORDER BY ?disease ?protein
