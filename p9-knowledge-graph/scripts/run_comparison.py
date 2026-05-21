@@ -38,15 +38,19 @@ import time
 from datetime import datetime
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
-from src.benchmark import BENCHMARK
-from src.sparql import SPARQLClient
-
-# ── p7 integration ────────────────────────────────────────────────────────────
+# ── p7 integration — must happen before p9 src is imported ───────────────────
+#
+# Both repos have a top-level src/ package. Python caches the first one it
+# finds in sys.modules['src']. If p9's src is imported first, the subsequent
+# `from src.evaluation.judge import ...` looks inside p9's src/ and fails.
+#
+# Fix: add p7_root to sys.path and import p7 modules first. Then clear p7's
+# src entries from sys.modules so p9's src can claim the namespace cleanly.
 
 P7_ROOT = Path(__file__).parent.parent.parent / "p7-rag-evaluation"
 sys.path.insert(0, str(P7_ROOT))
+
+_P7_IMPORT_ERROR: str = ""
 
 try:
     from langchain_ollama import ChatOllama
@@ -54,8 +58,18 @@ try:
     from src.retrieval.pipeline import retrieve as p7_retrieve   # type: ignore
     from langchain_core.messages import HumanMessage             # type: ignore
     P7_AVAILABLE = True
-except ImportError:
+except ImportError as _exc:
     P7_AVAILABLE = False
+    _P7_IMPORT_ERROR = str(_exc)
+
+# Clear p7's src entries so p9's src/ takes over the namespace.
+for _k in [k for k in sys.modules if k == "src" or k.startswith("src.")]:
+    del sys.modules[_k]
+
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from src.benchmark import BENCHMARK
+from src.sparql import SPARQLClient
 
 
 def _make_llm() -> object:
@@ -212,8 +226,8 @@ def main() -> None:
     args = parser.parse_args()
 
     if not P7_AVAILABLE and not args.sparql_only:
-        print("p7 not available — falling back to --sparql-only. "
-              "Run from portfolio root with p7 dependencies installed to enable RAG.")
+        print(f"p7 not available ({_P7_IMPORT_ERROR}) — falling back to --sparql-only.")
+        print("Install p7 deps: pip install -r ../p7-rag-evaluation/requirements.txt")
         args.sparql_only = True
 
     print("Running benchmark...")
