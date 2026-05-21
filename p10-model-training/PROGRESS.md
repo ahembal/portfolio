@@ -20,10 +20,10 @@ See [SPEC.md](SPEC.md) for full problem statement and system design.
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
 | 1 | Download BEETLE training data | ⬜ Todo | Register on Grand Challenge, download training set (587 cases, multi-scanner). |
-| 2 | WSI tiling | ⬜ Todo | Extract 512×512 patches at 20× magnification. Store as HDF5 or flat PNG tiles. |
-| 3 | Annotation masks | ⬜ Todo | Convert BEETLE pixel annotations to 4-class training masks (invasive epithelium, non-invasive epithelium, necrosis, other). |
-| 4 | Stain normalisation | ⬜ Todo | Apply Macenko or Vahadane normalisation to handle multi-scanner variation. |
-| 5 | Train/val split | ⬜ Todo | Split respecting site and scanner distribution — random split would leak scanner-specific staining into both sets. |
+| 2 | WSI tiling | ✅ Done | `data/tile.py` — 512×512 patches at 20×, Otsu tissue filter, PNG output + manifest rows. |
+| 3 | Annotation masks | ✅ Done | `data/masks.py` — TIFF mask loader + GeoJSON rasteriser; both map to 4-class uint8. |
+| 4 | Stain normalisation | ✅ Done | `data/normalise.py` — TIAToolbox Macenko/Vahadane wrapper; fitted once on reference slide. |
+| 5 | Train/val split | ✅ Done | `data/split.py` — GroupShuffleSplit by (scanner, site); slide-level groups prevent tile leakage. |
 
 ### Phase 2 — Baseline model
 | # | Step | Status | What & Why |
@@ -59,9 +59,24 @@ See [SPEC.md](SPEC.md) for full problem statement and system design.
 ## Quick status
 
 ```
-Phase 1  [░░░░░] 0/5 — Not started
-Phase 2  [░░░░]  0/4 — Not started
-Phase 3  [░░░]   0/3 — Not started
-Phase 4  [░░░]   0/3 — Not started
-Phase 5  [░░░]   0/3 — Not started
+Phase 1  [█░████] 4/5 — Data download pending (needs Grand Challenge registration)
+Phase 2  [░░░░]   0/4 — Not started
+Phase 3  [░░░]    0/3 — Not started
+Phase 4  [░░░]    0/3 — Not started
+Phase 5  [░░░]    0/3 — Not started
+```
+
+## How to run Phase 1
+
+```bash
+pip install -r requirements.txt
+
+# After downloading BEETLE data to data/raw/:
+python data/pipeline.py --config configs/baseline.yaml
+
+# With scanner/site metadata for a proper stratified split:
+python data/pipeline.py --config configs/baseline.yaml --metadata data/raw/metadata.csv
+
+# Dry-run to verify paths before writing:
+python data/pipeline.py --config configs/baseline.yaml --dry-run
 ```

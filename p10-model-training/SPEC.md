@@ -47,16 +47,16 @@ Three things this project addresses:
 | Other | Stroma, fat, normal tissue, background |
 
 **Dataset:** 587 biopsies/resections from multiple clinical centres, scanned on
-seven scanners. Training/resource data publicly available. Final evaluation
-annotations are sequestered — benchmarking handled through Grand Challenge.
+seven scanners. Evaluation set: 170 densely annotated ROIs from 54 WSIs
+(sequestered on Grand Challenge). Training/resource data publicly available.
 
 **Metric:** Overall Dice coefficient across all classes.
 
-**Leaderboard:** Active as of May 2026. Top score 0.9018. First milestone is
-a valid submission with reproducible Dice scores — a competitive baseline
-and possibly top-10 are realistic if the leaderboard is not saturated.
+**Leaderboard:** Active as of May 2026. Top score 0.9018.
 
-**Challenge URL:** beetle.grand-challenge.org
+**Grand Challenge submission:** Inference container submitted to GC; runs on
+GC's AWS infrastructure against the sequestered test set. Training is done
+locally on Dardel. See `docs/gc-submission.md`.
 
 ---
 
@@ -65,51 +65,98 @@ and possibly top-10 are realistic if the leaderboard is not saturated.
 ### 1. Data pipeline
 
 - Download and version the BEETLE training data
-- WSI tiling — extract fixed-size patches at appropriate magnification
-- Annotation handling — map pixel labels to training masks
-- Stain normalisation and augmentation — critical for multi-scanner generalisation
-- Train/val split respecting site/scanner distribution
+- WSI tiling — 512×512 patches at 20× magnification
+- Annotation handling — TIFF mask or GeoJSON polygon to 4-class training masks
+- Stain normalisation — Macenko (tile-time) + HueSaturationValue (training-time)
+- Train/val split respecting scanner and site distribution
 
-### 2. Baseline model
+### 2. Baseline — nnU-Net
 
-A patch-based semantic segmentation approach:
+**nnU-Net is the mandatory first baseline.** The BEETLE challenge organisers
+used nnU-Net-for-Pathology for technical validation and achieved:
 
-- **Architecture:** U-Net or DeepLabV3+ with ImageNet-pretrained encoder
-  (ResNet-50 or EfficientNet-B4)
-- **Input:** 512×512 patches extracted from WSI tiles
-- **Output:** 4-class probability map per patch
-- **Loss:** combination of cross-entropy and Dice loss
-- **Augmentation:** random flip/rotation, stain augmentation (Macenko/Vahadane)
+| Set | Overall Dice | Invasive | Non-invasive | Necrosis |
+|-----|-------------|----------|-------------|----------|
+| Development (5-fold) | **0.92** | 0.78 | 0.83 | 0.75 |
+| External test | **0.87** | 0.78 | 0.65 | 0.51 |
 
-### 3. Foundation model iteration
+This is the most relevant published baseline for BEETLE, trained on the exact
+data regime we are targeting. Any custom model must beat these numbers to justify
+the added complexity.
 
-After baseline: swap encoder for a pathology-specific foundation model:
-- UNI (ViT-L pretrained on 100k+ pathology slides, Harvard MIL)
-- CONCH (contrastive vision-language model for pathology)
+nnU-Net self-configures its architecture, preprocessing, and training schedule
+from the dataset properties. For BEETLE: RGB patches at 512×512, 0.5 µm/px,
+with balanced class sampling and 5-fold cross-validation ensemble.
 
-These encoders encode tissue morphology more richly than ImageNet-pretrained
-models. Expected improvement: 2-5 Dice points on hard classes (necrosis,
-non-invasive epithelium).
+nnU-Net is run as a separate training environment (its own conda env and config)
+rather than integrated into `src/train.py`. Results are logged to the p8 registry.
 
-### 4. WSI inference
+### 3. Custom segmentation model (post-baseline)
 
-- Sliding window inference across full WSI at test time
-- Patch-level predictions assembled into full slide segmentation map
-- Post-processing: smoothing, small region removal
+After nnU-Net establishes a baseline, a custom PyTorch model is trained using
+`src/train.py`. Architecture: **FM encoder + conservative decoder** (not an
+end-to-end foundation model). The decoder is U-Net or UPerNet; the encoder is
+one of:
 
-### 5. Experiment tracking
+| Encoder | Pretraining | Evidence |
+|---------|-------------|---------|
+| ResNet-50 | ImageNet | Reference point — establishes cost of ImageNet pretraining |
+| **CONCH** (ViT-B) | 1.17M pathology image-caption pairs | Best in Feb 2026 dense segmentation benchmark across 4 histopathology datasets |
+| **Virchow2** (ViT-H) | 3.1M pathology slides | Won PUMA Grand Challenge tissue segmentation (Virchow2 + Efficient-UNet) |
+
+UNI (previously listed as primary) is deprioritised: the independent 2026
+segmentation benchmark found CONCH and PathDino outperform UNI for dense
+prediction. The strongest concrete challenge win (PUMA) uses Virchow2.
+
+### 4. Multi-scanner generalisation
+
+Treating generalisation as only "Macenko + colour jitter" is insufficient for
+BEETLE's 7-scanner dataset. Evidence from adjacent challenges (COSAS, SCORPION)
+points to three additional strategies:
+
+- **Domain-adaptive convolutions** — content-and-domain adaptive layers that
+  adjust feature statistics per scanner at inference time (COSAS winner)
+- **Scanner-stratified ensembles** — train separate models or heads per scanner
+  group, ensemble at inference time (COSAS runner-up)
+- **Consistency regularisation** — penalise prediction drift across scanner
+  augmentations of the same patch (SCORPION's SimCons approach)
+
+At minimum, the val set must be scanner-stratified (implemented in `data/split.py`)
+so per-scanner Dice is reported alongside overall Dice.
+
+### 5. WSI inference
+
+- Sliding window inference at 50% overlap (stride = patch_size / 2)
+- Patch predictions averaged in overlap regions to reduce boundary artefacts
+- Full slide segmentation map assembled and saved as uint8 TIFF
+
+### 6. Experiment tracking
 
 All training runs registered in p8 model registry:
 - Hyperparameters, architecture, encoder
-- Per-class and overall Dice on validation set
+- Per-class and overall Dice on validation set, per scanner
 - Model weights stored in RGW with SHA verification
 - Deployment entry when a model is submitted to Grand Challenge
 
-### 6. Grand Challenge submission
+### 7. Grand Challenge submission
 
-- Package inference code as a Docker container per Grand Challenge requirements
+- Package inference code as Docker container (non-root, no outbound network)
 - Submit to BEETLE leaderboard
 - Record result in p8 registry evaluation entry
+
+---
+
+## Model option ranking (research-informed)
+
+Based on the BEETLE-specific evidence and adjacent challenge results:
+
+| Priority | Option | Justification |
+|----------|--------|--------------|
+| 1 | nnU-Net ensemble (5-fold) | Organiser baseline: 0.92 dev / 0.87 test. Must beat before iterating. |
+| 2 | CONCH + U-Net/UPerNet | Best in 2026 dense segmentation benchmark. Independent evidence. |
+| 3 | Virchow2 + Efficient-UNet | Won PUMA tissue segmentation. Strongest concrete challenge win. |
+| 4 | Domain-adaptive ensemble | COSAS winner pattern. Most relevant for multi-scanner robustness. |
+| 5 | ResNet-50 + U-Net | ImageNet baseline. Required for ablation but not competitive. |
 
 ---
 
@@ -119,20 +166,33 @@ All training runs registered in p8 model registry:
 p10-model-training/
 ├── SPEC.md
 ├── PROGRESS.md
-├── data/
-│   └── pipeline.py         ← download, tile, augment
-├── src/
-│   ├── model.py            ← architecture definition
-│   ├── train.py            ← training loop
-│   ├── evaluate.py         ← Dice computation, per-class metrics
-│   └── infer.py            ← WSI sliding window inference
 ├── configs/
-│   └── baseline.yaml       ← hyperparameters, paths
+│   └── baseline.yaml           ← hyperparameters, paths
+├── data/
+│   ├── pipeline.py             ← orchestrates data prep
+│   ├── tile.py                 ← WSI tiling at 20×
+│   ├── masks.py                ← annotation → 4-class mask
+│   ├── normalise.py            ← Macenko/Vahadane
+│   └── split.py                ← scanner+site stratified split
+├── src/
+│   ├── dataset.py              ← PyTorch Dataset + augmentation
+│   ├── model.py                ← U-Net / UPerNet with swappable encoder
+│   ├── train.py                ← training loop (Accelerate, fp16)
+│   ├── evaluate.py             ← Dice computation, per-class + per-scanner
+│   └── infer.py                ← WSI sliding window inference
 ├── submission/
-│   └── Dockerfile          ← Grand Challenge submission container
+│   ├── Dockerfile              ← Grand Challenge submission container
+│   └── process.py              ← GC entrypoint
 └── docs/
     ├── how-it-works.md
-    └── results.md          ← experiment results, leaderboard scores
+    ├── model-options.md
+    ├── data-pipeline.md
+    ├── evaluation.md
+    ├── implementation.md
+    ├── training-on-dardel.md
+    ├── gc-submission.md
+    ├── security.md
+    └── results.md
 ```
 
 ---
@@ -141,15 +201,16 @@ p10-model-training/
 
 | Project | Connection |
 |---------|-----------|
-| p1 | p1 deploys the serving pipeline. p10 produces better weights to replace TIAToolbox in p1. |
-| p8 | All p10 training runs are registered in p8. Dice scores become evaluation entries. |
-| p6/p7 | Demonstrates the broader AI-ready data infrastructure context. |
+| p1 | p1 deploys the serving pipeline. p10 produces better weights (segmentation) that could replace TIAToolbox in p1. |
+| p8 | All p10 training runs logged in p8 registry. Dice scores become evaluation entries. Grand Challenge result recorded. |
+| p6/p7 | Same domain (breast pathology, PubMed/UniProt data). Demonstrates full AI stack: literature retrieval (p6) → knowledge graph (p9) → model training (p10) → serving (p1). |
 
 ---
 
 ## Out of scope
 
 - Instance segmentation (nuclei, gland boundaries)
-- Whole slide inference at 40× magnification (40× requires significantly more compute)
+- WSI inference at 40× magnification
 - Multi-task learning (classification + segmentation simultaneously)
 - Real-time inference (batch offline inference is sufficient)
+- Full clinical validation under MDR (research/benchmarking scope only — see `docs/security.md`)
