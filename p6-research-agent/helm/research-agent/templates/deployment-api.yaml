@@ -5,6 +5,11 @@ metadata:
   namespace: {{ .Values.namespace }}
 spec:
   replicas: {{ .Values.api.replicas }}
+  # Recreate required: chromadb-pvc is RWO — only one pod can mount it at a time.
+  # RollingUpdate would keep the old pod alive while starting the new one,
+  # causing "Multi-Attach error: Volume already used by pod X".
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: research-agent-api

@@ -38,6 +38,24 @@ higher limit only kicks in during ingestion spikes.
 
 ---
 
+## Deployment strategy — Recreate
+
+The research-agent-api Deployment uses `strategy: Recreate` instead of the
+Kubernetes default `RollingUpdate`.
+
+The ChromaDB PVC is `ReadWriteOnce` — only one pod can mount it at a time.
+With RollingUpdate, Kubernetes starts the new pod before terminating the old
+one. The new pod cannot mount the PVC while the old pod holds it, and gets
+stuck with `Multi-Attach error: Volume already used by pod X`.
+
+`Recreate` terminates the old pod first, then starts the new one. This accepts
+a brief downtime window on deployment. For a stateful single-replica service
+backed by a RWO PVC, this is the correct strategy.
+
+The same pattern applies to Fuseki (p9) which uses TDB2 on a RWO PVC.
+
+---
+
 ## Sentence-transformer model choice
 
 **Decision:** `all-MiniLM-L6-v2` (default in sentence-transformers)
