@@ -52,6 +52,8 @@ htmlcov/
 
 # Results (committed manually when ready)
 p3-spark-benchmark/results/*.csv
+results/
+p9-knowledge-graph/results/
 
 # Claude session memory and planning artifacts
 .claude/
