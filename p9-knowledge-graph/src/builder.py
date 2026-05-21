@@ -51,7 +51,7 @@ SEED_PROTEINS: list[tuple[str, str]] = [
 
 PUBMED_BASE = "http://purl.uniprot.org/pubmed/"
 DEFAULT_OUTPUT = Path("data/seed/graph.ttl")
-MAX_PAPERS_PER_PROTEIN = 50
+MAX_PAPERS_PER_PROTEIN = 200
 
 
 def extract_pmids(protein_graph: Graph) -> list[str]:
@@ -142,9 +142,13 @@ def build(
         for data in pubmed.fetch_batch(new_pmids):
             pmid = data["uid"]
             seen_pmids.add(pmid)
-            paper_graph = paper_to_rdf(data)
-            full_graph += paper_graph
+            full_graph += paper_to_rdf(data)
 
+        # Add p9:mentions for every paper in this protein's citation list,
+        # including papers already fetched for a previous protein. Without this,
+        # shared papers only get a mentions edge to whichever protein claimed them
+        # first — breaking set-intersection queries like Q2 and Q10.
+        for pmid in pmids:
             paper_uri = URIRef(f"{PUBMED_BASE}{pmid}")
             full_graph.add((paper_uri, P9.mentions, protein_uri))
 
