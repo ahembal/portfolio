@@ -1,0 +1,53 @@
+data:
+  # Paths — set these after downloading from Grand Challenge
+  wsi_dir:   data/raw/wsis         # downloaded WSI files (.tiff / .svs / .ndpi)
+  mask_dir:  data/raw/masks        # BEETLE annotation masks (same stem as WSI)
+  tiles_dir: data/tiles            # output: RGB patches + class masks
+
+  patch_size: 512                  # pixels at target magnification
+  stride: 512                      # stride = patch_size → no overlap for training
+  magnification: 20                # 20× objective
+
+  # Patches with less tissue than this fraction are skipped
+  min_tissue_fraction: 0.5
+
+  # Annotation format: "mask" (TIFF/PNG, pixel value = class index)
+  #                    "geojson" (polygon annotations with class property)
+  annotation_format: mask
+
+  val_fraction: 0.2
+  seed: 42
+
+normalisation:
+  # macenko | vahadane | none
+  # Applied at tile-extraction time using TIAToolbox.
+  # A reference WSI is required for macenko/vahadane — set to one of your
+  # training slides (pick a well-stained representative slide).
+  method: macenko
+  reference_wsi: null              # e.g. data/raw/wsis/case_001.tiff
+
+# 4-class mapping used by BEETLE
+# Pixel values in annotation masks map to these class indices.
+classes:
+  0: other                         # stroma, fat, background, normal tissue
+  1: invasive_epithelium
+  2: non_invasive_epithelium
+  3: necrosis
+
+model:
+  architecture: unet               # unet | deeplabv3plus
+  encoder: resnet50                # resnet50 | efficientnet-b4
+  num_classes: 4
+  pretrained: true                 # ImageNet weights for encoder
+
+training:
+  batch_size: 16
+  num_epochs: 50
+  lr: 1.0e-4
+  weight_decay: 1.0e-5
+  early_stopping_patience: 10
+  mixed_precision: fp16            # fp16 | bf16 | no
+
+  # Dice + cross-entropy combination
+  dice_weight: 0.5
+  ce_weight: 0.5
