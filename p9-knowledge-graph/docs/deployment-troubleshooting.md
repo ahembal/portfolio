@@ -89,7 +89,61 @@ long-term mitigation (StatefulSet with HA).
 
 ---
 
-## Issue 5 — `scripts/run_comparison.py` reports "p7 not available"
+## Issue 5 — Set-intersection queries return no results (Q2, Q5, Q10)
+
+**Symptom:**
+```sparql
+-- Which papers mention both TP53 and BRCA1?
+SELECT ?paper WHERE {
+  ?paper p9:mentions uprot:P04637 ;
+         p9:mentions uprot:P38398 .
+}
+-- Returns: no results
+```
+
+**Root cause:** A bug in `build()` in `src/builder.py`. The loop fetched
+paper data only for PMIDs not yet seen (`new_pmids`), but added the
+`p9:mentions` edge only inside that same fetch loop:
+
+```python
+new_pmids = [p for p in pmids if p not in seen_pmids]
+for data in pubmed.fetch_batch(new_pmids):          # only NEW papers
+    ...
+    full_graph.add((paper_uri, P9.mentions, protein_uri))  # mention added here
+```
+
+When processing TP53, paper `15489334` is fetched and gets
+`p9:mentions → TP53`. It is added to `seen_pmids`. When processing BRCA1,
+the same paper is in `seen_pmids` so the entire block is skipped —
+`p9:mentions → BRCA1` is never added. The paper exists in the graph but
+only connects to the first protein that claimed it.
+
+UniProt's citation lists for TP53 (P04637) and BRCA1 (P38398) share at
+least 3 PMIDs in their top 200 entries. The bug made them invisible as
+co-mentions.
+
+**Fix (applied 2026-05-21):** Separate fetching from edge creation.
+Fetch only new papers, but add `p9:mentions` for **all** papers in the
+current protein's citation list:
+
+```python
+new_pmids = [p for p in pmids if p not in seen_pmids]
+for data in pubmed.fetch_batch(new_pmids):
+    pmid = data["uid"]
+    seen_pmids.add(pmid)
+    full_graph += paper_to_rdf(data)
+
+# Mention edge for ALL citation-listed papers, not just newly fetched ones
+for pmid in pmids:
+    paper_uri = URIRef(f"{PUBMED_BASE}{pmid}")
+    full_graph.add((paper_uri, P9.mentions, protein_uri))
+```
+
+Requires a graph rebuild after applying the fix.
+
+---
+
+## Issue 6 — `scripts/run_comparison.py` reports "p7 not available"
 
 **Symptom:**
 ```
