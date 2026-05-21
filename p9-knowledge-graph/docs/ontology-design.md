@@ -131,3 +131,30 @@ PubMed IDs and UniProt accessions are stored as both:
 
 This allows SPARQL queries to either traverse relationships (`?paper p9:mentions
 p9:protein_P04637`) or filter on identifiers (`FILTER(?uid = "P04637")`).
+
+---
+
+### Design decision — paper node URIs (2026-05-21)
+
+**Current approach:** Paper nodes use UniProt's pubmed URIs as their primary
+identifier (`http://purl.uniprot.org/pubmed/PMID`). Our triples — title,
+authors, `p9:mentions` edges, EDAM topics — are attached directly to that URI.
+
+**Original approach:** Paper nodes used `p9:paper_PMID` as primary URI, with
+`owl:sameAs <http://purl.uniprot.org/pubmed/PMID>` to bridge into UniProt's
+citation system.
+
+**Why it was changed:** Plain SPARQL does not follow `owl:sameAs` automatically.
+Fuseki requires an OWL inference profile to materialise sameAs-inferred triples
+at query time. Without inference, traversals that cross the sameAs bridge
+(paper → protein → disease via UniProt's citation graph) return nothing.
+
+**Why OWL inference was not enabled instead:** The inference layer adds
+overhead to every query across the dataset — not just those that need sameAs.
+Fixing the problem at the data level is cheaper and more permanent.
+
+**When to reconsider:** If the dataset grows large enough that using
+`purl.uniprot.org` URIs as primary identifiers for our own paper entities
+creates a namespace ownership or maintenance concern. In that case,
+re-introduce `p9:paper_*` URIs and either enable OWL inference in
+`fuseki/config.ttl` or rewrite queries to avoid cross-namespace traversal.

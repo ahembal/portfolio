@@ -22,8 +22,9 @@ import sys
 from pathlib import Path
 
 from rdflib import Graph, Literal, Namespace, URIRef
-from rdflib.namespace import OWL, RDF, XSD
+from rdflib.namespace import RDF, XSD
 
+from src.aligner import align
 from src.clients import pubmed, uniprot
 
 log = logging.getLogger("p9.builder")
@@ -66,13 +67,19 @@ def extract_pmids(protein_graph: Graph) -> list[str]:
 
 
 def paper_to_rdf(data: dict) -> Graph:
-    """Convert a PubMed esummary record to RDF triples."""
+    """Convert a PubMed esummary record to RDF triples.
+
+    Paper nodes use UniProt's pubmed URIs (purl.uniprot.org/pubmed/PMID)
+    as their primary identifier. UniProt's up:citation edges already point
+    to these URIs, so paper → protein traversal works without owl:sameAs
+    or OWL inference.
+    """
     g = Graph()
     g.bind("p9", P9)
     g.bind("schema", SCH)
 
     pmid = data["uid"]
-    uri  = P9[f"paper_{pmid}"]
+    uri  = URIRef(f"{PUBMED_BASE}{pmid}")
 
     g.add((uri, RDF.type,          P9.Paper))
     g.add((uri, P9.pmid,           Literal(pmid, datatype=XSD.string)))
@@ -82,9 +89,6 @@ def paper_to_rdf(data: dict) -> Graph:
     journal = data.get("source", "")
     if journal:
         g.add((uri, SCH.isPartOf, Literal(journal)))
-
-    # owl:sameAs ties our local paper node into UniProt's pubmed namespace
-    g.add((uri, OWL.sameAs, URIRef(f"{PUBMED_BASE}{pmid}")))
 
     for author in data.get("authors", []):
         name     = author.get("name", "")
@@ -141,7 +145,7 @@ def build(
             paper_graph = paper_to_rdf(data)
             full_graph += paper_graph
 
-            paper_uri = P9[f"paper_{pmid}"]
+            paper_uri = URIRef(f"{PUBMED_BASE}{pmid}")
             full_graph.add((paper_uri, P9.mentions, protein_uri))
 
     log.info(
@@ -155,6 +159,9 @@ def build(
             log.warning("validation", extra={"issue": e})
     else:
         log.info("validation passed")
+
+    align(full_graph)
+    log.info("edam alignment applied", extra={"triples_after": len(full_graph)})
 
     output.parent.mkdir(parents=True, exist_ok=True)
     full_graph.serialize(str(output), format="turtle")
