@@ -54,6 +54,7 @@ htmlcov/
 p3-spark-benchmark/results/*.csv
 results/
 p9-knowledge-graph/results/
+p9-knowledge-graph/data/seed/
 
 # Claude session memory and planning artifacts
 .claude/
