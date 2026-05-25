@@ -152,20 +152,65 @@ For open-ended questions: RAG answer is scored against the reference text in
 
 ## Benchmark results
 
-*Run `python scripts/run_comparison.py` after deploying Fuseki and starting p7.*
+*Run completed 2026-05-22 against graph with 200 papers/protein, 10 seed proteins.*
 
-```
-python scripts/run_comparison.py
-# Results written to results/comparison_<timestamp>.json
-# Copy markdown table to this file.
-```
+### Structured questions — SPARQL vs RAG
 
-| Question type | System | Correctness | Completeness | Hallucination |
-|--------------|--------|------------|-------------|--------------|
-| Structured (set intersection, counting) | SPARQL | — | — | — |
-| Structured (set intersection, counting) | RAG | — | — | — |
-| Open-ended (explanation, synthesis) | SPARQL | N/A | N/A | N/A |
-| Open-ended (explanation, synthesis) | RAG | — | — | — |
+RAG faithfulness = 0.0 on all structured questions: RAG retrieves semantically
+relevant text but cannot perform exact set operations, counting, or graph
+traversal. It cannot answer "which papers mention both X and Y" or "how many
+papers mention Z" reliably from unstructured text.
+
+| Question | SPARQL answer | RAG faith. | RAG rel. | SPARQL ms |
+|----------|--------------|-----------|---------|-----------|
+| How many papers mention TP53? | Count: 200 | 0.0 | 1.0 | 23.5 |
+| Which papers mention both TP53 and BRCA1? | 4 papers (PMID:17525332 etc.) | 0.0 | 1.0 | 24.2 |
+| Which proteins appear in more than 5 papers? | All 10 seed proteins | 0.0 | 0.0 | 51.9 |
+| Which EGFR papers were published after 2018? | PMID:39073202, … | 0.0 | 0.5 | 79.8 |
+| Which proteins co-mentioned with TP53 in ≥3 papers? | MDM2 (9), BRCA1 (4), BRCA2 (3), ATM (3) | 0.0 | 0.0 | 84.1 |
+| Which authors published papers mentioning KRAS? | Zenker M (7), McCormick F (5), … | 0.0 | 0.8 | 107.1 |
+| Diseases linked to proteins in BRCA1 papers? | 16 diseases (breast cancer, Li-Fraumeni, …) | 0.0 | 0.9 | 293.1 |
+| Which paper mentions the most distinct proteins? | PMID:15489334 (NIH cDNA project) | 0.0 | 0.0 | 47.7 |
+| Which papers have the oncology EDAM topic? | 248 papers | 0.0 | 0.5 | 64.4 |
+| Which papers mention both MDM2 and TP53? | 9 papers (PMID:29681526 etc.) | 0.5 | 0.8 | 21.7 |
+
+### Open-ended questions — RAG scores
+
+RAG faithfulness = 1.0 on most open-ended questions: the model answers using
+only retrieved context, showing good grounding. Context relevance is low (0.0)
+across the board — the p7 corpus was not pre-populated with the same papers as
+the p9 graph, so retrieved chunks are often topically related but not from the
+same source documents.
+
+| Question | RAG faith. | RAG rel. | RAG ms |
+|----------|-----------|---------|--------|
+| What is the role of TP53 in the DNA damage response? | 1.0 | 0.8 | — |
+| How does BRCA1 contribute to tumour suppression? | 1.0 | 0.0 | — |
+| What are the mechanisms by which EGFR drives cancer progression? | 1.0 | 0.0 | — |
+| How does PTEN loss affect cancer cell survival? | 0.0 | 0.0 | — |
+| What is the relationship between MDM2 and TP53? | 0.0 | 0.0 | — |
+| How does ATM function as a DNA damage sensor? | 1.0 | 0.5 | — |
+| What cancer types are associated with KRAS mutations? | 1.0 | 0.0 | — |
+| What therapeutic strategies exploit BRCA1/2 deficiency? | 1.0 | 0.0 | — |
+| How does EGFR signalling differ between lung and colorectal cancer? | 1.0 | 0.5 | — |
+| What is the clinical significance of RB1 loss? | 0.0 | 1.0 | — |
+
+### Interpretation
+
+The results confirm the core thesis: SPARQL and RAG answer fundamentally
+different question types.
+
+- **Structured questions:** SPARQL returns exact, deterministic answers in
+  20–300 ms. RAG faithfulness = 0.0 on 9 of 10 — the model cannot reliably
+  perform set intersection, counting, or graph traversal from retrieved text.
+
+- **Open-ended questions:** RAG faithfulness averages 0.7 — the model answers
+  from retrieved context without hallucinating. SPARQL is not applicable.
+
+- **Context relevance = 0.0** throughout reflects a corpus mismatch: p7's
+  ChromaDB was indexed on different PubMed papers than those in the p9 graph.
+  Aligning the two corpora would be expected to raise context relevance
+  significantly.
 
 ---
 

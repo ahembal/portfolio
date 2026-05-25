@@ -39,8 +39,8 @@
 ## Phase 5 — RAG vs SPARQL comparison
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 14 | Run benchmark | ⬜ Todo | `python scripts/run_comparison.py` — needs live Fuseki + p7. Writes results/ and markdown table. |
-| 15 | Fill comparison.md | ⬜ Todo | Add benchmark results table to `docs/comparison.md`. |
+| 14 | Run benchmark | ✅ Done | Full 20-question comparison run 2026-05-22. SPARQL: all 10 structured queries return results. RAG faithfulness avg 0.7 on open-ended, 0.05 on structured — confirms SPARQL/RAG complementarity. |
+| 15 | Fill comparison.md | ✅ Done | `docs/comparison.md` — full results table with SPARQL answers, RAG scores, and interpretation. |
 
 ## Phase 6 — GraphRAG (planned)
 | # | Step | Status | What & Why |
