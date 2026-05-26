@@ -19,7 +19,6 @@ The worker uses a synchronous SQLAlchemy session (not async) — Celery runs its
 own event loop per task and mixing asyncio here adds complexity without benefit.
 """
 
-import hashlib
 import os
 import time
 
@@ -33,10 +32,8 @@ from sqlalchemy.orm import Session
 from src.storage.db import FileMetadata
 from src.storage.s3 import (
     RGWConfig,
-    build_s3_key,
-    ensure_bucket,
+    download_bytes,
     get_s3_client,
-    upload_bytes,
 )
 
 log = setup_logging("p2-metadata-ingestion.worker")
@@ -100,65 +97,52 @@ def _get_sync_session() -> Session:
 def process_file(
     self,
     job_id: str,
-    filename: str,
-    content_type: str | None,
-    content: bytes,
+    s3_key: str,
+    bucket: str,
+    storage_cfg: dict,
 ) -> dict:
     """
-    Process a single ingestion job:
+    Post-process a single ingestion job:
       pending → processing → done | failed
 
-    Retried up to 3 times with 30-second backoff on transient errors
-    (S3 timeout, DB connectivity blip). Permanent failures (e.g. corrupt file)
-    set status=failed with an error message.
+    The API handler uploads the file to S3 and computes SHA-256 before queuing
+    this task — only the S3 key reference is passed through Redis, not the file
+    bytes. This avoids Redis message size limits for large files.
+
+    The worker downloads the file once to detect its MIME type (python-magic
+    needs raw bytes; the upload Content-Type from the client is not trusted),
+    then updates the DB record to done.
+
+    Retried up to 3 times with 30-second backoff on transient errors.
     """
     t0 = time.perf_counter()
-    log.info("file_processing_started", extra={"job_id": job_id, "file_name": filename})
+    log.info("file_processing_started", extra={"job_id": job_id, "s3_key": s3_key})
     session = _get_sync_session()
     try:
-        # Mark processing
         record = session.get(FileMetadata, job_id)
         if record is None:
             return {"status": "skipped", "reason": "record not found"}
         record.status = "processing"
         session.commit()
 
-        # 1. SHA-256 checksum
-        sha256 = hashlib.sha256(content).hexdigest()
-
-        # 2. MIME type — detect from bytes, don't trust the upload header
-        detected_type = magic.from_buffer(content, mime=True)
-
-        # 3. S3 upload
-        storage_cfg = {
-            "endpoint": os.environ.get("RGW_ENDPOINT", "http://192.168.1.16"),
-            "access_key": os.environ["RGW_ACCESS_KEY"],
-            "secret_key": os.environ["RGW_SECRET_KEY"],
-            "bucket": os.environ.get("STORAGE_BUCKET", "metadata-files"),
-        }
+        # Download from S3 to detect the true MIME type.
         rgw = RGWConfig(
             endpoint=storage_cfg["endpoint"],
             access_key=storage_cfg["access_key"],
             secret_key=storage_cfg["secret_key"],
         )
         s3 = get_s3_client(rgw)
-        bucket = storage_cfg["bucket"]
-        ensure_bucket(s3, bucket)
-        s3_key = build_s3_key(job_id, filename)
-        log.info("file_uploaded_to_s3", extra={"job_id": job_id, "s3_key": s3_key})
-        upload_bytes(s3, bucket, s3_key, content, detected_type)
+        content = download_bytes(s3, bucket, s3_key)
+        detected_type = magic.from_buffer(content, mime=True)
 
-        # 4. Update record → done
-        record.sha256 = sha256
         record.content_type = detected_type
-        record.s3_key = s3_key
         record.status = "done"
         session.commit()
 
         JOB_DURATION.observe(time.perf_counter() - t0)
         JOB_STATUS_TOTAL.labels(status="done").inc()
         log.info("file_processing_done", extra={"job_id": job_id, "duration_ms": round((time.perf_counter() - t0) * 1000, 1)})
-        return {"status": "done", "job_id": job_id, "sha256": sha256}
+        return {"status": "done", "job_id": job_id}
 
     except Exception as exc:
         session.rollback()

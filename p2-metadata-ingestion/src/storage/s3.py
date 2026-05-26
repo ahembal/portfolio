@@ -70,6 +70,12 @@ def upload_bytes(
     )
 
 
+def download_bytes(s3_client, bucket: str, key: str) -> bytes:
+    """Download an object from S3 and return its raw bytes. Raises on any S3 error."""
+    response = s3_client.get_object(Bucket=bucket, Key=key)
+    return response["Body"].read()
+
+
 def ensure_bucket(s3_client, bucket: str) -> None:
     """Create the bucket if it does not already exist."""
     existing = {b["Name"] for b in s3_client.list_buckets().get("Buckets", [])}

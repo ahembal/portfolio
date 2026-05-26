@@ -27,9 +27,10 @@ from src.storage.db import FileMetadata
 # ---------------------------------------------------------------------------
 
 @pytest.mark.asyncio
-async def test_ingest_returns_202_and_job_id(client):
+async def test_ingest_returns_202_and_job_id(client, mock_s3):
     """POST /ingest with a valid file returns 202 and a UUID job_id."""
-    with patch("src.api.main.process_file") as mock_task:
+    with patch("src.api.main.process_file") as mock_task, \
+         patch("src.api.main.get_s3_client", return_value=mock_s3):
         mock_task.delay = MagicMock()
         response = await client.post(
             "/ingest",
@@ -44,9 +45,10 @@ async def test_ingest_returns_202_and_job_id(client):
 
 
 @pytest.mark.asyncio
-async def test_ingest_creates_db_record(client, session_factory):
-    """POST /ingest persists a FileMetadata record with status=pending."""
-    with patch("src.api.main.process_file") as mock_task:
+async def test_ingest_creates_db_record(client, session_factory, mock_s3):
+    """POST /ingest persists a FileMetadata record with sha256 and s3_key already set."""
+    with patch("src.api.main.process_file") as mock_task, \
+         patch("src.api.main.get_s3_client", return_value=mock_s3):
         mock_task.delay = MagicMock()
         response = await client.post(
             "/ingest",
@@ -62,13 +64,16 @@ async def test_ingest_creates_db_record(client, session_factory):
     assert record.filename == "data.csv"
     assert record.status == "pending"
     assert record.size_bytes == len(b"col1,col2\n1,2")
-    assert record.sha256 is None      # not yet computed — worker does this
+    assert record.sha256 is not None   # computed in API handler before queuing
+    assert len(record.sha256) == 64
+    assert record.s3_key is not None   # uploaded in API handler before queuing
 
 
 @pytest.mark.asyncio
-async def test_ingest_queues_celery_task(client):
-    """POST /ingest calls process_file.delay with the correct job_id."""
-    with patch("src.api.main.process_file") as mock_task:
+async def test_ingest_queues_celery_task(client, mock_s3):
+    """POST /ingest calls process_file.delay with job_id and s3_key — no file bytes."""
+    with patch("src.api.main.process_file") as mock_task, \
+         patch("src.api.main.get_s3_client", return_value=mock_s3):
         mock_task.delay = MagicMock()
         response = await client.post(
             "/ingest",
@@ -77,7 +82,8 @@ async def test_ingest_queues_celery_task(client):
         job_id = response.json()["job_id"]
         mock_task.delay.assert_called_once()
         call_args = mock_task.delay.call_args[0]
-        assert call_args[0] == job_id  # first positional arg is job_id
+        assert call_args[0] == job_id         # first arg: job_id
+        assert isinstance(call_args[1], str)  # second arg: s3_key (not bytes)
 
 
 # ---------------------------------------------------------------------------
@@ -86,64 +92,78 @@ async def test_ingest_queues_celery_task(client):
 
 @pytest.mark.asyncio
 async def test_worker_transitions_to_done(session_factory, mock_s3):
-    """Worker sets status=done and writes sha256 + s3_key on success."""
+    """Worker downloads from S3, detects MIME type, and sets status=done."""
     from src.workers.tasks import process_file
 
-    # Pre-insert a pending record
     job_id = str(uuid.uuid4())
+    s3_key = f"uploads/2026/05/26/{job_id}/report.pdf"
+    storage_cfg = {
+        "endpoint": "http://localhost:9000",
+        "access_key": "test-key",
+        "secret_key": "test-secret",
+        "bucket": "metadata-files",
+    }
+
     async with session_factory() as session:
         record = FileMetadata(
             id=uuid.UUID(job_id),
             filename="report.pdf",
             content_type="application/pdf",
             size_bytes=6,
+            sha256="a" * 64,
+            s3_key=s3_key,
             status="pending",
         )
         session.add(record)
         await session.commit()
 
-    content = b"%PDF-1"
-
     with patch("src.workers.tasks.get_s3_client", return_value=mock_s3), \
          patch("src.workers.tasks.RGWConfig"):
-        process_file(job_id, "report.pdf", "application/pdf", content)
+        process_file(job_id, s3_key, "metadata-files", storage_cfg)
 
     async with session_factory() as session:
         updated = await session.get(FileMetadata, uuid.UUID(job_id))
 
     assert updated.status == "done"
-    assert updated.sha256 is not None
-    assert len(updated.sha256) == 64       # SHA-256 hex digest length
-    assert updated.s3_key is not None
-    assert job_id in updated.s3_key
-    mock_s3.put_object.assert_called_once()
+    assert updated.content_type is not None   # MIME detected from downloaded bytes
+    mock_s3.get_object.assert_called_once()   # worker downloads, does not upload
 
 
 @pytest.mark.asyncio
 async def test_worker_sets_failed_on_s3_error(session_factory, mock_s3):
-    """Worker sets status=failed and records error_msg when S3 upload fails."""
+    """Worker sets status=failed and records error_msg when S3 download fails."""
     from src.workers.tasks import process_file
 
     job_id = str(uuid.uuid4())
+    s3_key = f"uploads/2026/05/26/{job_id}/broken.bin"
+    storage_cfg = {
+        "endpoint": "http://localhost:9000",
+        "access_key": "test-key",
+        "secret_key": "test-secret",
+        "bucket": "metadata-files",
+    }
+
     async with session_factory() as session:
         record = FileMetadata(
             id=uuid.UUID(job_id),
             filename="broken.bin",
             content_type="application/octet-stream",
             size_bytes=4,
+            sha256="b" * 64,
+            s3_key=s3_key,
             status="pending",
         )
         session.add(record)
         await session.commit()
 
-    mock_s3.put_object.side_effect = Exception("S3 connection refused")
+    mock_s3.get_object.side_effect = Exception("S3 connection refused")
 
     with patch("src.workers.tasks.get_s3_client", return_value=mock_s3), \
          patch("src.workers.tasks.RGWConfig"), \
          pytest.raises(Exception):
         process_file.apply(
-            args=[job_id, "broken.bin", "application/octet-stream", b"\x00\x01\x02\x03"],
-            retries=3,  # exhaust retries immediately in test
+            args=[job_id, s3_key, "metadata-files", storage_cfg],
+            retries=3,
             throw=True,
         )
 

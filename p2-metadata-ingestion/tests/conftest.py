@@ -103,6 +103,9 @@ def mock_s3():
     s3 = MagicMock()
     s3.list_buckets.return_value = {"Buckets": [{"Name": "metadata-files"}]}
     s3.put_object.return_value = {}
+    body_mock = MagicMock()
+    body_mock.read.return_value = b"%PDF-1"
+    s3.get_object.return_value = {"Body": body_mock}
     return s3
 
 

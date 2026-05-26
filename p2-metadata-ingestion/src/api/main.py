@@ -18,6 +18,7 @@ Design principles (same as p1):
     does the heavy work asynchronously
 """
 
+import hashlib
 import os
 import time
 import uuid
@@ -50,6 +51,14 @@ from src.storage.db import (
     get_session_factory,
 )
 from src.workers.tasks import process_file
+from src.storage.s3 import (
+    RGWConfig,
+    build_s3_key,
+    ensure_bucket,
+    get_s3_client,
+    get_storage_config,
+    upload_bytes,
+)
 from src.logging_config import setup_logging
 from src.middleware import RequestLoggingMiddleware
 
@@ -126,19 +135,40 @@ async def ingest(file: UploadFile = File(...)):
     t0 = time.perf_counter()
     content = await file.read()
     job_id = uuid.uuid4()
+    filename = file.filename or "unknown"
+
+    # Compute SHA-256 in memory before any I/O.
+    sha256 = hashlib.sha256(content).hexdigest()
+
+    # Upload to S3 here so the Celery message carries only a key reference,
+    # not the file bytes. Passing bytes through Redis caps practical file size
+    # at ~50 MB and can exhaust Redis memory under concurrent load.
+    storage_cfg = get_storage_config()
+    rgw = RGWConfig(
+        endpoint=storage_cfg["endpoint"],
+        access_key=storage_cfg["access_key"],
+        secret_key=storage_cfg["secret_key"],
+    )
+    s3 = get_s3_client(rgw)
+    bucket = storage_cfg["bucket"]
+    ensure_bucket(s3, bucket)
+    s3_key = build_s3_key(str(job_id), filename)
+    upload_bytes(s3, bucket, s3_key, content)
 
     async with app_state["session_factory"]() as session:
         record = FileMetadata(
             id=job_id,
-            filename=file.filename or "unknown",
+            filename=filename,
             content_type=file.content_type,
             size_bytes=len(content),
+            sha256=sha256,
+            s3_key=s3_key,
             status="pending",
         )
         session.add(record)
         await session.commit()
 
-    process_file.delay(str(job_id), file.filename, file.content_type, content)
+    process_file.delay(str(job_id), s3_key, bucket, storage_cfg)
 
     INGEST_TOTAL.labels(status="queued").inc()
     INGEST_LATENCY.labels(endpoint="/ingest").observe(
