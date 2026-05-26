@@ -7,6 +7,7 @@ A LangGraph agent that answers life science research questions by autonomously s
 - LLM agent architecture: LangGraph state graph with reason → act → respond loop
 - Tool-augmented generation: structured tool calls with provenance tracking
 - Citation hallucination detection: every cited identifier is verified against retrieved tool results
+- Structured JSON logging at two layers — API boundary and agent graph internals — with OTel-compatible format
 - Production deployment: FastAPI + Streamlit + Ollama (Llama 3.1 8B) on Kubernetes
 
 ## Stack
@@ -36,7 +37,7 @@ The agent:
 - **Citation provenance validation** — every `[PMID:xxxxx]` and `[UniProt:Pxxxxx]` in the answer is checked against the retrieved identifier set; unverified citations surface a warning
 - **English-only filter** — PubMed searches are wrapped with `AND English[Language]`
 
-See [`docs/how-it-works.md`](docs/how-it-works.md) for the full architecture, and [`docs/design-decisions.md`](docs/design-decisions.md) for post-deployment fixes.
+See [`docs/how-it-works.md`](docs/how-it-works.md) for the full architecture, [`docs/design-decisions.md`](docs/design-decisions.md) for post-deployment fixes, and [`docs/observability.md`](docs/observability.md) for the logging and metrics design.
 
 ## Related
 

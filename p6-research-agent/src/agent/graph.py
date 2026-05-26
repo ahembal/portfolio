@@ -8,6 +8,7 @@ reliably returns empty content with Llama 3.1 8B.
 """
 
 import json
+import logging
 import os
 from typing import Annotated
 
@@ -41,6 +42,8 @@ class AgentState(TypedDict):
 _TOOLS = [pubmed_search, pubmed_fetch, uniprot_lookup, rag_search]
 _TOOL_MAP = {t.name: t for t in _TOOLS}
 
+log = logging.getLogger("p6-research-agent.graph")
+
 
 # ---------------------------------------------------------------------------
 # Nodes
@@ -70,10 +73,15 @@ def act(state: AgentState) -> dict:
         tool = _TOOL_MAP.get(call["name"])
         if tool is None:
             result = {"error": f"unknown tool: {call['name']}"}
+            log.warning("tool_unknown", extra={"tool": call["name"]})
         else:
             try:
+                log.info("tool_invoked", extra={"tool": call["name"], "tool_args": str(call["args"])[:200]})
                 result = tool.invoke(call["args"])
+                if isinstance(result, dict) and "error" in result:
+                    log.warning("tool_error", extra={"tool": call["name"], "error": result["error"]})
             except Exception as exc:
+                log.error("tool_exception", extra={"tool": call["name"], "exception_type": type(exc).__name__, "exception_message": str(exc)})
                 result = {"error": str(exc)}
 
         tool_messages.append(
