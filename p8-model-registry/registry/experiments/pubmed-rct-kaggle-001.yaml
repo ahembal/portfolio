@@ -1,0 +1,44 @@
+id: pubmed-rct-kaggle-001
+date: "2026-05-10"
+model_id: distilbert-pubmed-rct
+conducted_by: emre
+
+framework:
+  name: pytorch
+  version: "2.1"
+  extra:
+    - transformers==4.40.2
+    - datasets==2.18.0
+
+compute:
+  platform: kaggle
+  gpu: T4
+  training_time_hours: 1.2
+
+hyperparameters:
+  epochs: 3
+  batch_size: 32
+  learning_rate: 2.0e-5
+  optimizer: AdamW
+  loss: CrossEntropyLoss
+  warmup_steps: 500
+  max_length: 512
+
+dataset:
+  name: PubMed RCT 200k
+  split: train
+  size: 180040
+  source: public
+  preprocessing: lowercased via DistilBERT tokenizer (uncased)
+
+artifact:
+  location: s3://nlp-models/pubmed-rct/v1/model.safetensors
+  sha: 85a297c5e4046c3d387167166ad3056e5356a22ad872255a3f4942416355ea42
+  size_bytes: null
+
+notes: >
+  Fine-tuning run from distilbert-base-uncased on 5-class abstract sentence
+  classification (background, objective, method, result, conclusion).
+  Training converged within 3 epochs. Model exported to safetensors format
+  and uploaded to RGW at the artifact location above.
+  Registered and SHA-verified 2026-05-12.
