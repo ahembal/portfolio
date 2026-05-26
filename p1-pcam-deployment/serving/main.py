@@ -53,7 +53,6 @@ from prometheus_client import (
     generate_latest,
 )
 
-sys.path.insert(0, str(Path(__file__).resolve().parent / "infra" / "ceph-rgw"))
 from logging_config import setup_logging
 from middleware import RequestLoggingMiddleware
 
