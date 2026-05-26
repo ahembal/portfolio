@@ -152,7 +152,7 @@ For open-ended questions: RAG answer is scored against the reference text in
 
 ## Benchmark results
 
-*Run completed 2026-05-22 against graph with 200 papers/protein, 10 seed proteins.*
+*Run completed 2026-05-22 against graph with 10 seed proteins, 878 unique papers (57–200 per protein depending on UniProt citation list size; TP53 is the only protein that saturates the 200-paper cap).*
 
 ### Structured questions — SPARQL vs RAG
 

@@ -143,7 +143,42 @@ Requires a graph rebuild after applying the fix.
 
 ---
 
-## Issue 6 — `scripts/run_comparison.py` reports "p7 not available"
+## Issue 6 — Stale triples after Fuseki restart (POST stacking)
+
+**Symptom:**
+Triple count increases on each restart even though the source `graph.ttl` has
+not changed. Queries return duplicate values for the same subject (e.g. two
+`schema:name` triples for the same paper with different titles).
+
+**Cause:** The `postStart` hook loads `graph.ttl` using `POST /p9/data`. In
+the RDF Graph Store Protocol, POST *adds* triples to the existing graph — it
+does not replace it. If TDB2 already contains triples from a previous load,
+the new triples are stacked on top. Any triple that was changed or removed in
+the new build still exists in TDB2 from the old load.
+
+The old Fuseki deployment accumulated 144,472 triples this way — higher than
+the 131,023 from the initial load — because a prior restart had stacked a
+second copy of the graph.
+
+**Fix:** Before restarting the pod, clear TDB2 via the SPARQL update endpoint:
+
+```bash
+curl -X POST http://<node>:30900/p9/update \
+  -u "admin:<password>" \
+  -H "Content-Type: application/sparql-update" \
+  --data "DROP ALL"
+```
+
+Then restart the deployment. The initContainer downloads the new `graph.ttl`
+from RGW and the postStart hook loads it into an empty TDB2.
+
+**Note:** `PUT /p9/data` would replace the graph in one step (no DROP ALL
+needed), but the current `postStart` hook uses POST. Changing to PUT would
+be the cleaner long-term fix.
+
+---
+
+## Issue 7 — `scripts/run_comparison.py` reports "p7 not available"
 
 **Symptom:**
 ```
