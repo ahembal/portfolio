@@ -1,5 +1,6 @@
 # Used by Dockerfile for pip install -r requirements.txt.
 # pyproject.toml is the source of truth for development installs.
+langchain-core>=0.1.0
 biopython>=1.83
 chromadb>=0.5
 sentence-transformers>=3.0
