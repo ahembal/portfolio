@@ -101,6 +101,46 @@ Pydantic models: `QueryRequest`, `QueryResponse`, `Citation`, `StepRecord`,
 `HealthResponse`. `Citation` has a `type` field ("pubmed" or "uniprot") so
 the Streamlit UI can render the correct link format for each.
 
+### src/api/main.py — /query/stream (SSE endpoint)
+
+**What SSE is:** Server-Sent Events — the server holds an HTTP connection open
+and pushes newline-delimited chunks to the client as they are ready. Each chunk
+has the format `data: {json}\n\n`. The client reads them one by one. There is
+no polling, no WebSocket handshake — it is plain HTTP.
+
+**Why SSE over a blocking POST /query:**
+`graph.invoke()` blocks the event loop for 40–90 seconds while Llama 3.1 8B
+runs inference. The Streamlit UI shows a blank page for that entire duration.
+SSE lets the UI show each tool call and result as it happens — the user sees
+"Searching PubMed…" while the agent is still working.
+
+**Event types emitted:**
+
+| Type | Payload | When |
+|------|---------|------|
+| `tool_call` | `{tool, args}` | LLM decides to call a tool |
+| `tool_result` | `{tool, content}` | Tool returns a result |
+| `answer` | `{content}` | Final LLM answer (after all tools) |
+| `citations` | `{citations: [...]}` | Extracted citations |
+| `done` | — | Stream complete |
+| `error` | `{message}` | Any exception or timeout |
+
+**Implementation:** LangGraph's `graph.stream()` is synchronous (not async).
+It cannot be awaited inside a FastAPI async handler. The solution:
+
+1. A daemon thread runs `graph.stream()` and pushes each yielded event into an
+   `asyncio.Queue` via `loop.call_soon_threadsafe(queue.put_nowait, event)`.
+2. The async generator `generate()` awaits items from the queue with a 180s
+   timeout and yields them as SSE lines.
+3. FastAPI wraps the generator in a `StreamingResponse` with
+   `media_type="text/event-stream"` and `X-Accel-Buffering: no` (required to
+   prevent nginx from buffering the stream).
+
+**Problem hit:** `asyncio.Queue` is not thread-safe to write to directly.
+`queue.put_nowait(event)` from a thread can corrupt the queue.
+Fix: use `loop.call_soon_threadsafe()` which schedules the put on the event
+loop thread safely.
+
 ### src/api/main.py
 lifespan pattern: `build_graph()` called once at startup, stored in `_state`.
 Citation extraction happens in the `/query` handler by iterating over

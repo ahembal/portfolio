@@ -84,6 +84,38 @@ If the knowledge sources were a private, unstructured document store, citations 
 
 ---
 
+## Streaming: why SSE over polling or WebSockets
+
+The original `/query` endpoint blocks for 40–90 seconds while the agent runs.
+The Streamlit UI shows nothing during this time — the user has no feedback on
+whether the query is working or stuck.
+
+**Option considered: polling.** The client submits a job, gets a job ID, and
+polls `/status/{id}` every few seconds. This adds a job queue, a status store,
+and extra round-trips. It is correct but over-engineered for a single-user
+research assistant.
+
+**Option considered: WebSockets.** Full bidirectional — appropriate when the
+client also sends events mid-stream. For an agent that just needs to push
+progress updates to the UI, WebSockets add complexity with no benefit.
+
+**Chosen: Server-Sent Events (SSE).** A single HTTP connection that the server
+holds open and writes to incrementally. The client reads chunks as they arrive.
+Plain HTTP — no upgrade handshake, no persistent connection management, no
+extra library. The Streamlit page uses the standard `requests` library with
+`stream=True`.
+
+The event types match the agent's natural checkpoints: tool selected,
+tool result received, final answer produced, citations extracted. Each event
+is independently useful — the user can see which papers are being searched
+before the answer is ready.
+
+SSE has one limitation: it is unidirectional. If a follow-up query needed to
+interrupt an in-progress agent run, SSE would not support it. For v1
+(one question at a time), this is not a constraint.
+
+---
+
 ## Limitations
 
 | Limitation | Impact |
