@@ -134,4 +134,10 @@ jobs:
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add p1-pcam-deployment/helm/pcam-inference/values.yaml
           git diff --staged --quiet || git commit -m "ci(p1): update image tag to ${SHORT_SHA}"
-          git pull --rebase && git push
+          # Pull before push to handle concurrent workflow runs on the same branch.
+          # Push is retried once — if another run pushed between our pull and push,
+          # the first push fails with a non-fast-forward error; the retry re-pulls
+          # and succeeds. Without this, a race silently drops the tag update and
+          # ArgoCD never syncs. See runbooks/common-issues.md — CI git push pattern.
+          git pull --rebase
+          git push || (git pull --rebase && git push)

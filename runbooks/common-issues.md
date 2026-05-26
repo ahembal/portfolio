@@ -1,5 +1,34 @@
 # Common Issues
 
+## CI/CD — git push pattern for values.yaml tag updates
+
+All project CI workflows (p1, p2, p4, p6, p8) write a new image SHA to
+`values.yaml` and push it back to `main` so ArgoCD detects drift and syncs.
+
+**The problem with `git pull --rebase && git push`:**
+If two workflows run concurrently (e.g. a merge and a tag trigger firing at
+the same time), both fetch the same HEAD, both commit locally, and the second
+push fails with a non-fast-forward error. Because `&&` chains the commands,
+the push failure propagates and the step exits non-zero — but the commit is
+already local, not on `main`. ArgoCD never sees the tag update.
+
+**The correct pattern (used in all CI workflows):**
+```bash
+git pull --rebase
+git push || (git pull --rebase && git push)
+```
+
+Split `pull` and `push` so each has a distinct exit code. Retry the push
+once on failure — the retry re-pulls the now-updated remote and pushes
+cleanly. Two concurrent pushes resolve in at most two attempts.
+
+**Why not `--force`?**
+Force-pushing `main` would discard any commits that landed between the
+workflow's checkout and its push. The retry-with-rebase approach is safe
+because it incorporates those commits rather than overwriting them.
+
+---
+
 ## Deploying to the homelab cluster — known constraints
 
 ### No dynamic StorageClass
