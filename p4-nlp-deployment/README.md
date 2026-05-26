@@ -98,7 +98,19 @@ ArgoCD manages the live deployment — see [`helm/nlp-inference/`](helm/nlp-infe
 
 See [`docs/implementation.md`](docs/implementation.md) and [`docs/how-it-works.md`](docs/how-it-works.md) for full detail.
 
+## UI
+
+There is no standalone Streamlit app in this directory — `streamlit/app.py` is an empty placeholder.
+The live UI for this project is [`3_NLP_Classifier.py`](../p6-research-agent/streamlit/pages/3_NLP_Classifier.py)
+in the shared portfolio Streamlit app (`p6-research-agent/streamlit/`), which hosts all project demos
+under one multi-page interface. Run it from there:
+
+```bash
+cd p6-research-agent
+streamlit run streamlit/app.py
+```
+
 ## Related
 
 - **[p8](../p8-model-registry/)** — exports this model to ONNX and benchmarks serving formats
-- **[p6](../p6-research-agent/)** — uses PubMed as a live data source for the research agent
+- **[p6](../p6-research-agent/)** — shared Streamlit app and research agent using PubMed as a live data source
