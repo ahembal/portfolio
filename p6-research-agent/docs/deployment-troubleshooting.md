@@ -172,6 +172,34 @@ PermissionError: [Errno 13] Permission denied: '/.streamlit'
 
 ---
 
+## 12. ChromaDB PersistentClient vs HttpClient — two processes on one volume
+
+**Symptom:** RAG search returns empty results on a fresh deployment even after
+manually running `index()`. Alternatively: ChromaDB data corruption after pod
+restart.
+
+**Root cause:** `vector_store.py` used `chromadb.PersistentClient(path=...)`,
+which writes SQLite files directly to the mounted volume. The separate `chromadb`
+container (running the official ChromaDB HTTP server) mounted the same volume and
+also wrote to it. Two processes accessing the same SQLite files concurrently
+causes corruption and unpredictable read results.
+
+Additionally, `PersistentClient` with path `/tmp/chromadb` was the hardcoded
+default — ephemeral and lost on every pod restart regardless of the volume.
+
+**Fix:** Switched `vector_store.py` to `chromadb.HttpClient`, which talks to the
+`chromadb` service over HTTP. The chromadb container exclusively owns the volume
+and all reads/writes go through it. The `api` container needs no volume mount.
+`CHROMADB_HOST` and `CHROMADB_PORT` env vars control the connection (defaulting
+to `chromadb:8000`).
+
+**Seed corpus:** On a fresh deployment ChromaDB is empty, making the `rag_search`
+tool useless. Added `src/seed.py` which indexes `data/seed_corpus.json` (10
+curated protein summaries + SciLifeLab context) at API startup if the collection
+is empty. This runs automatically — no manual indexing step required.
+
+---
+
 ## 11. OOMKilled during corpus ingestion
 
 **Symptom:** Running corpus ingestion (embedding ~200 PubMed abstracts) inside the

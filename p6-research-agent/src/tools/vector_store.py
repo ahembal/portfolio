@@ -19,6 +19,7 @@ Why semantic search and not keyword search:
 """
 
 import hashlib
+import os
 
 import chromadb
 from chromadb.config import Settings
@@ -32,10 +33,17 @@ CHUNK_SIZE    = 512    # characters per chunk
 CHUNK_OVERLAP = 64     # overlap between consecutive chunks
 
 
-def _get_client(persist_dir: str = "/tmp/chromadb") -> chromadb.Client:
-    """Return a persistent ChromaDB client."""
-    return chromadb.PersistentClient(
-        path=persist_dir,
+def _get_client() -> chromadb.HttpClient:
+    # The chromadb service runs as a separate container in both docker-compose
+    # and K8s. Using HttpClient (not PersistentClient) means storage is owned
+    # exclusively by the chromadb container — the api container does not write
+    # to the volume directly and there is no risk of two processes corrupting
+    # the same files. See docs/deployment-troubleshooting.md §12.
+    host = os.getenv("CHROMADB_HOST", "chromadb")
+    port = int(os.getenv("CHROMADB_PORT", "8000"))
+    return chromadb.HttpClient(
+        host=host,
+        port=port,
         settings=Settings(anonymized_telemetry=False),
     )
 
@@ -56,10 +64,7 @@ def _chunk(text: str) -> list[str]:
     return chunks
 
 
-def index(
-    documents: list[dict],
-    persist_dir: str = "/tmp/chromadb",
-) -> int:
+def index(documents: list[dict]) -> int:
     """
     Embed and store documents in ChromaDB.
 
@@ -67,7 +72,6 @@ def index(
         documents: list of dicts with keys:
                      text   (str) — the document content
                      source (str) — identifier for the source (e.g. filename, URL)
-        persist_dir: path where ChromaDB stores its files
 
     Returns:
         number of chunks indexed
@@ -75,11 +79,10 @@ def index(
     Example:
         >>> index([
         ...     {"text": "TP53 is the most frequently mutated gene...", "source": "seed.txt"},
-        ...     {"text": "SciLifeLab provides national infrastructure...", "source": "scilifelab.txt"},
         ... ])
-        12
+        3
     """
-    client     = _get_client(persist_dir)
+    client     = _get_client()
     model      = _get_model()
     collection = client.get_or_create_collection(COLLECTION)
 
@@ -115,32 +118,20 @@ class RagSearchInput(BaseModel):
 
 
 @tool("rag_search", args_schema=RagSearchInput)
-def search(
-    query: str,
-    k: int = 5,
-    persist_dir: str = "/tmp/chromadb",
-) -> list[dict]:
+def search(query: str, k: int = 5) -> list[dict]:
     """
     Search the corpus for the k most relevant chunks.
 
     Args:
-        query:       natural language query
-        k:           number of results to return (default 5)
-        persist_dir: path to ChromaDB storage
+        query: natural language query
+        k:     number of results to return (default 5)
 
     Returns:
         list of dicts with keys: text, source, score
         Returns [] if corpus is empty or an error occurs.
-
-    Example:
-        >>> search("tumour suppressor function", k=3)
-        [
-          {"text": "TP53 acts as a tumour suppressor by...", "source": "seed.txt", "score": 0.87},
-          {"text": "Cell cycle arrest is triggered when...", "source": "seed.txt", "score": 0.81},
-        ]
     """
     try:
-        client     = _get_client(persist_dir)
+        client     = _get_client()
         model      = _get_model()
         collection = client.get_or_create_collection(COLLECTION)
 

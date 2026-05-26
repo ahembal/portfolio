@@ -12,6 +12,7 @@ from src.api.logging_config import setup_logging
 from src.api.middleware import RequestLoggingMiddleware
 from src.api.schemas import Citation, HealthResponse, QueryRequest, QueryResponse, StepRecord
 from src.agent.graph import build_graph
+from src.seed import seed_if_empty
 from src.tools.vector_store import search as rag_search
 
 log = setup_logging()
@@ -44,6 +45,7 @@ async def lifespan(app: FastAPI):
     _state["graph"] = build_graph()
     _state["ollama_url"] = os.getenv("OLLAMA_BASE_URL", "http://ollama:11434")
     _state["model"] = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
+    seed_if_empty()
     log.info("service_ready")
     yield
     log.info("service_stopping")
