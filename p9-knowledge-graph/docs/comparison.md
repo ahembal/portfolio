@@ -214,13 +214,64 @@ different question types.
 
 ---
 
-## GraphRAG — next step
+## GraphRAG — third system
 
-GraphRAG combines both approaches:
-1. SPARQL traversal identifies the relevant entities and their relationships
-2. Vector search retrieves the relevant passages for those entities
-3. LLM synthesises an answer grounded in both the graph structure and the text
+GraphRAG combines both approaches into a single pipeline:
 
-This handles the case where a question is partially structured ("which proteins
-are mentioned in papers about glioblastoma") and partially open-ended ("and what
-do we know about their function?"). See PROGRESS.md for the planned implementation.
+1. **SPARQL traversal** — identifies relevant entities and pulls graph facts:
+   co-mentioned proteins, function annotations, disease annotations, recent papers
+2. **Vector retrieval** — queries p7 ChromaDB using entity names as the search
+   string, retrieving unstructured passages about those entities
+3. **LLM synthesis** — combines both sources into a grounded answer using a
+   prompt engineered to use all graph facts and apply precise language about
+   what the graph actually asserts
+
+See `src/graphrag.py` for the implementation and
+`docs/graphrag-prompt-engineering.md` for the full prompt iteration record.
+
+### What GraphRAG handles that SPARQL and RAG cannot
+
+| Question type | SPARQL | RAG | GraphRAG |
+|--------------|--------|-----|----------|
+| Exact set intersection | ✅ | ❌ | ✅ (via SPARQL step) |
+| Counting and aggregation | ✅ | ❌ | ✅ (via SPARQL step) |
+| Multi-hop graph traversal | ✅ | ❌ | ✅ (via SPARQL step) |
+| Functional explanation | ❌ | ✅ | ✅ (via function annotations + LLM) |
+| Hybrid: "which X, and what do we know about them?" | ❌ | ❌ | ✅ |
+
+### Hybrid question type
+
+The benchmark (`src/benchmark.py`) now contains 30 questions in three groups:
+10 structured (SPARQL favoured), 10 open-ended (RAG favoured), 10 hybrid
+(GraphRAG favoured). Hybrid questions have two parts — a structured part that
+SPARQL answers exactly, and an open-ended part requiring synthesis.
+
+Example:
+```
+Which proteins are co-mentioned with TP53 in at least 3 papers,
+and what do we know about how they relate to TP53 biology?
+```
+
+- SPARQL part: returns MDM2 (9 papers), BRCA1 (4), BRCA2 (3), ATM (3)
+- Synthesis part: explains MDM2-TP53 regulation, ATM-mediated stabilisation,
+  BRCA1 cooperation in DNA damage response
+
+Neither SPARQL alone (returns URIs, not explanations) nor RAG alone (cannot
+reliably perform the co-mention count) answers the full question.
+
+### Key design decisions in the synthesis prompt
+
+The prompt was iterated three times before producing correct output. Two
+critical framing rules emerged:
+
+**Co-occurrence vs association:** the graph records which proteins appear in
+the same papers — not that they interact biologically. The prompt instructs
+the LLM to say "co-mentioned in the papers represented in the graph" rather
+than "associated with", which would assert a relationship the graph does not
+encode.
+
+**Source provenance:** protein function annotations (UniProt `up:Function_Annotation`)
+are structurally distinct from paper titles in the graph context. Without
+explicit instruction to use function annotations specifically, the LLM read
+paper titles as functional descriptions — producing lower-quality answers.
+Full iteration record: `docs/graphrag-prompt-engineering.md`.

@@ -42,11 +42,11 @@
 | 14 | Run benchmark | ✅ Done | Full 20-question comparison run 2026-05-22. SPARQL: all 10 structured queries return results. RAG faithfulness avg 0.7 on open-ended, 0.05 on structured — confirms SPARQL/RAG complementarity. |
 | 15 | Fill comparison.md | ✅ Done | `docs/comparison.md` — full results table with SPARQL answers, RAG scores, and interpretation. |
 
-## Phase 6 — GraphRAG (planned)
+## Phase 6 — GraphRAG
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 16 | graphrag.py | ⬜ Planned | Combine SPARQL entity traversal with p7 vector retrieval. LLM synthesises answer from both. |
-| 17 | Extend benchmark | ⬜ Planned | Add GraphRAG as third system in the comparison. Add hybrid question type to benchmark. |
+| 16 | graphrag.py | ✅ Done | `src/graphrag.py` — SPARQL context (papers, co-mentions, function annotations, diseases) + p7 vector retrieval + LLM synthesis. Prompt engineered across 3 iterations; documented in `docs/graphrag-prompt-engineering.md`. |
+| 17 | Extend benchmark | ✅ Done | 10 hybrid questions added to `src/benchmark.py` (total: 30). `docs/comparison.md` updated with GraphRAG section. |
 
 ## Phase 7 — Imaging facilities domain (planned)
 | # | Step | Status | What & Why |
@@ -65,8 +65,8 @@ Phase 1  [████] 4/4 — Complete
 Phase 2  [███]  3/3 — Complete
 Phase 3  [██████] 6/6 ✅
 Phase 4  [███]  3/3 — Complete (sparql.py + 8 queries + 20 benchmark questions)
-Phase 5  [░░]   0/2 — Needs live Fuseki + p7 to run
-Phase 6  [░░]   0/2 — Planned (GraphRAG)
+Phase 5  [██]   2/2 — Complete
+Phase 6  [██]   2/2 — Complete (GraphRAG)
 Phase 7  [░░░░] 0/4 — Planned (Imaging facilities)
 ```
 
