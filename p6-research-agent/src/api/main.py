@@ -172,11 +172,25 @@ async def query(req: QueryRequest):
     hallucinated = (cited_pmids | cited_uniprot) - retrieved_ids
     if hallucinated:
         log.warning("provenance_warning", extra={"hallucinated_ids": sorted(hallucinated)})
-        answer += (
-            f"\n\n⚠️ Provenance warning: the following identifiers appear in "
-            f"the answer but were not retrieved by any tool call — they may be "
-            f"hallucinated: {', '.join(sorted(hallucinated))}"
-        )
+        # Strip hallucinated citation tags from the answer text entirely.
+        # The claim the LLM made may still be correct — only the fake reference
+        # number is wrong. Removing it leaves a readable sentence rather than
+        # a confusing inline warning tag.
+        #
+        # TODO(provenance): the proper fix is upstream — instruct the LLM in
+        # the system prompt to cite ONLY IDs returned by tool calls in the
+        # current turn. Stripping is a reliable post-processing fallback but
+        # does not prevent the LLM from generating hallucinated IDs in the
+        # first place. Prompt change lives in src/agent/graph.py (system prompt
+        # in build_graph()) and requires evaluation against the p7 benchmark
+        # before merging to confirm it does not reduce citation recall on
+        # verified sources.
+        for h_id in hallucinated:
+            answer = re.sub(
+                rf'\s*\[(PMID|UniProt):{re.escape(h_id)}\]',
+                '',
+                answer,
+            )
 
     log.info("query_completed", extra={
         "latency_ms":   round(latency_ms, 1),
