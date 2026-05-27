@@ -4,11 +4,19 @@ Reciprocal Rank Fusion — merges ranked lists from BM25 and dense search.
 RRF score for a document = Σ 1 / (k + rank)  for each list it appears in.
 k=60 is the standard constant from the original RRF paper (Cormack et al. 2009).
 
-Documents are identified by their source string. Chunks from the same source
-are treated as distinct entries.
+Documents are identified by a hash of (source, full text). Using text[:64] as
+the key caused silent deduplication when two chunks from the same source shared
+the same opening 64 characters (e.g. repeated section headers).
 """
 
+import hashlib
+
 K = 60
+
+
+def _chunk_key(item: dict) -> str:
+    digest = hashlib.sha256(item["text"].encode()).hexdigest()[:16]
+    return f"{item['source']}::{digest}"
 
 
 def fuse(
@@ -32,7 +40,7 @@ def fuse(
 
     for result_list in (bm25_results, dense_results):
         for item in result_list:
-            key = f"{item['source']}::{item['text'][:64]}"
+            key = _chunk_key(item)
             scores[key] = scores.get(key, 0.0) + 1.0 / (k + item["rank"])
             docs[key]   = item
 

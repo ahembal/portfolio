@@ -122,14 +122,13 @@ hpa:
 # ---------------------------------------------------------------------------
 # Probes
 # ---------------------------------------------------------------------------
-# The /health endpoint returns 200 only after the model is loaded from RGW.
-# Initial delay must cover the model download time (~5 s on local network).
+# Covers HuggingFace Hub cold start (~30-60 s). Reduce to 30 s once RGW loading is restored (PROGRESS.md F0).
 probes:
   liveness:
     path: /health
-    initialDelaySeconds: 30
+    initialDelaySeconds: 90
     periodSeconds: 10
   readiness:
     path: /health
-    initialDelaySeconds: 15
+    initialDelaySeconds: 90
     periodSeconds: 5
