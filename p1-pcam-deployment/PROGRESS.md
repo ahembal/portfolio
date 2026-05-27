@@ -66,6 +66,15 @@
 
 ---
 
+## Post-review fixes (2026-05-27)
+
+| # | Fix | What & Why |
+|---|-----|------------|
+| R1 | Added docs table to README | p1 README had no links to `docs/` — added table matching the pattern used by p2/p6 |
+| R2 | readinessProbe initialDelaySeconds — pending | Current value is 15 s — too short for cold starts when the model loads from HuggingFace Hub (~30–60 s). Needs increasing to ~90 s. See ISSUES.md. |
+
+---
+
 ## Files created
 
 | File | Purpose |

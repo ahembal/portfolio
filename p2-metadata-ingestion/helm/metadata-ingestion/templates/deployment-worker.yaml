@@ -59,5 +59,25 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.credentialsSecret }}
                   key: secret-key
+          livenessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - celery -A src.workers.tasks inspect ping -d celery@$HOSTNAME --timeout 3
+            initialDelaySeconds: 30
+            periodSeconds: 60
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - /bin/sh
+                - -c
+                - celery -A src.workers.tasks inspect ping -d celery@$HOSTNAME --timeout 3
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}

@@ -50,6 +50,20 @@
 
 ---
 
+---
+
+## Post-review fixes (2026-05-27)
+
+| # | Fix | What & Why |
+|---|-----|------------|
+| R1 | File size limit on `/ingest` | `MAX_UPLOAD_BYTES` env var (default 100 MB) — `file.read()` loads the whole file into RAM; without a cap a large upload OOMs the pod |
+| R2 | Worker liveness + readiness probes | `celery inspect ping` exec probe — without probes K8s cannot detect a deadlocked worker; it keeps sending tasks to a pod that will never process them |
+| R3 | DB pool size configurable | `DB_POOL_SIZE` / `DB_MAX_OVERFLOW` env vars — with fixed pool_size=10 + max_overflow=20, four worker replicas under HPA would exceed Postgres default max_connections (100) |
+| R4 | Sync engine as module-level singleton | Creating `create_engine()` inside each task call opened a new pool per invocation; moved to module-level so connections are reused across tasks |
+| R5 | Exponential backoff on S3 retry | Fixed 30 s delay replaced with `30 * (2 ** retries)` — 30 s, 60 s, 120 s; avoids thundering herd when S3 recovers after an outage |
+| R6 | Sync DB URL via `make_url` | `str.replace()` on the raw URL is brittle if the password contains special characters; SQLAlchemy's `make_url` parses and reconstructs the URL correctly |
+| R7 | Large data / streaming section in q6-scalability.md | Documents chunked upload, pandas chunksize, DuckDB, Polars, and Spark options with interview-ready rule of thumb |
+
 ## Quick status
 
 ```

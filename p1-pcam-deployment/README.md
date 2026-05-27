@@ -37,6 +37,18 @@ curl http://<node-ip>:30100/health
 - ONNX p50 latency: **2.65 ms** (2.97× faster than PyTorch — see [p8](../p8-model-registry/))
 - Container image: ~200 MB (distroless base)
 
+## Docs
+
+| File | What it covers |
+|------|----------------|
+| [how-it-works.md](docs/how-it-works.md) | End-to-end flow: request → model → response |
+| [q5-ml-deploy.md](docs/q5-ml-deploy.md) | ML deployment design rationale |
+| [q7-docker-helm-k8s.md](docs/q7-docker-helm-k8s.md) | Container, Helm chart, ArgoCD GitOps |
+| [implementation.md](docs/implementation.md) | Developer notes — problems hit, decisions made |
+| [security-compliance.md](docs/security-compliance.md) | Distroless, non-root, SealedSecrets |
+| [deployment-troubleshooting.md](docs/deployment-troubleshooting.md) | Common issues and fixes |
+| [model-limitations.md](docs/model-limitations.md) | What the model does and does not handle |
+
 ## Related
 
 - **[p8](../p8-model-registry/)** — packages and benchmarks this model (ONNX vs PyTorch, format comparison)

@@ -29,6 +29,8 @@ from prometheus_client import Counter, Histogram
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
+from sqlalchemy.engine import make_url
+
 from src.storage.db import FileMetadata
 from src.storage.s3 import (
     RGWConfig,
@@ -73,15 +75,32 @@ celery_app.conf.update(
 # ---------------------------------------------------------------------------
 
 def _sync_db_url() -> str:
-    # asyncpg driver is async-only; use psycopg2 for the sync Celery context
-    return os.environ["DATABASE_URL"].replace(
-        "postgresql+asyncpg://", "postgresql+psycopg2://"
-    )
+    # asyncpg driver is async-only; use psycopg2 for the sync Celery context.
+    # make_url handles percent-encoded special chars in passwords correctly;
+    # a naive .replace() on the raw URL string would not.
+    url = make_url(os.environ["DATABASE_URL"])
+    return url.set(drivername="postgresql+psycopg2").render_as_string(hide_password=False)
+
+
+_sync_engine = None
 
 
 def _get_sync_session() -> Session:
-    engine = create_engine(_sync_db_url(), pool_pre_ping=True)
-    return Session(engine)
+    # Module-level engine singleton — creating a new engine per task would open
+    # a new connection pool on every invocation, exhausting Postgres connections
+    # under HPA scale-out. Pool size is configurable so operators can tune it
+    # relative to the number of worker replicas.
+    global _sync_engine
+    if _sync_engine is None:
+        pool_size = int(os.environ.get("DB_POOL_SIZE", "5"))
+        max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", "10"))
+        _sync_engine = create_engine(
+            _sync_db_url(),
+            pool_pre_ping=True,
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+        )
+    return Session(_sync_engine)
 
 
 # ---------------------------------------------------------------------------
@@ -91,7 +110,6 @@ def _get_sync_session() -> Session:
 @celery_app.task(
     bind=True,
     max_retries=3,
-    default_retry_delay=30,
     name="metadata.process_file",
 )
 def process_file(
@@ -158,7 +176,8 @@ def process_file(
         JOB_DURATION.observe(time.perf_counter() - t0)
         JOB_STATUS_TOTAL.labels(status="failed").inc()
         log.error("file_processing_failed", extra={"job_id": job_id, "exception_type": type(exc).__name__, "exception_message": str(exc)[:200]})
-        raise self.retry(exc=exc)
+        # Exponential backoff: 30s, 60s, 120s.
+        raise self.retry(exc=exc, countdown=30 * (2 ** self.request.retries))
 
     finally:
         session.close()

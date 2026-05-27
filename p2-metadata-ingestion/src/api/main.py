@@ -122,6 +122,9 @@ app.add_middleware(RequestLoggingMiddleware)
 # ---------------------------------------------------------------------------
 
 
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))  # 100 MB default
+
+
 @app.post("/ingest", response_model=IngestResponse, status_code=202)
 async def ingest(file: UploadFile = File(...)):
     """
@@ -134,6 +137,11 @@ async def ingest(file: UploadFile = File(...)):
     """
     t0 = time.perf_counter()
     content = await file.read()
+    if len(content) > MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File too large: {len(content)} bytes (limit {MAX_UPLOAD_BYTES})",
+        )
     job_id = uuid.uuid4()
     filename = file.filename or "unknown"
 

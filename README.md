@@ -79,6 +79,6 @@ See [BIGPICTURE.md](BIGPICTURE.md) for a full cross-project dependency map and [
 
 ## How to navigate
 
-Each project has its own `SPEC.md` (what and why), `PROGRESS.md` (current status), and `docs/` directory. Start with the SPEC to understand the project, then follow the progress tracker for current state.
-
-For the research agent (p6) and knowledge graph (p9), the `docs/how-it-works.md` is the best entry point for understanding the system end-to-end.
+- **[docs/INDEX.md](docs/INDEX.md)** — topic-based map of all documentation across projects (large-scale data, ML deployment, security, observability, etc.)
+- Each project has its own `SPEC.md` (what and why), `PROGRESS.md` (current status), and `docs/` directory with a table of contents in the README.
+- For the research agent (p6) and knowledge graph (p9), `docs/how-it-works.md` is the best entry point.

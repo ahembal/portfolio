@@ -92,10 +92,109 @@ PostgreSQL with a connection pool of 10 + 20 overflow supports ~300 concurrent
 connections before queuing. For the `/files` list endpoint (read-heavy), a
 PgBouncer connection pooler or a read replica would be the next step.
 
+**Connection pool arithmetic under HPA scale-out:**
+
+Postgres has a hard `max_connections` limit (default 100 on a stock install).
+Every pool instance opens up to `pool_size + max_overflow` connections. With
+multiple replicas, this compounds:
+
+| Replicas | pool_size | max_overflow | Max connections used |
+|----------|-----------|--------------|----------------------|
+| 1        | 10        | 20           | 30                   |
+| 3        | 10        | 20           | 90                   |
+| 4        | 10        | 20           | 120 ← exceeds default limit |
+
+So at 4 worker replicas the service starts refusing DB connections.
+
+**What we do:** `DB_POOL_SIZE` and `DB_MAX_OVERFLOW` are env vars, set low on
+the worker (default 5 + 10 = 15 per pod) so the total stays safe as HPA
+scales out. The API uses higher defaults (10 + 20) since it has fewer replicas.
+
+**A second trap:** if the engine is created inside each task call rather than
+once at module load, every task invocation opens a new pool — even if only
+one replica is running. The engine in `src/workers/tasks.py` is a module-level
+singleton to avoid this.
+
 ### S3 / Ceph RGW layer
 Ceph RGW handles concurrent PUTs well — the bottleneck is network bandwidth to
 the RGW nodes. On the homelab LAN (1 Gbps), the ceiling is roughly 100 MB/s
 aggregate upload throughput (~200 × 0.5 MB files/s or ~2 × 50 MB files/s).
+
+---
+
+## Handling large data without loading it all into memory
+
+This is a common interview question: *"What if the file was 1 GB? Or what if your CSV had millions of rows?"*
+
+The underlying problem is the same in both cases: `file.read()` or `pd.read_csv()` loads everything into RAM at once. On a pod with 512 MB memory limit, a 600 MB file causes an OOM kill. The fix is to never hold the whole dataset in memory at once.
+
+### For file uploads (the p2 case)
+
+**What we do now:** `content = await file.read()` — the entire file goes into RAM.
+Safe for files up to the pod memory limit, which is why we added a 100 MB cap.
+
+**Option 1 — Chunked streaming to S3 (multipart upload):**
+Read the file in fixed chunks (e.g. 8 MB), pipe each chunk directly to an S3
+multipart upload, compute the checksum incrementally with `hashlib.update()`.
+Peak RAM usage stays at one chunk size regardless of file size.
+
+```python
+sha = hashlib.sha256()
+mpu = s3.create_multipart_upload(Bucket=bucket, Key=key)
+parts = []
+part_num = 1
+async for chunk in file.stream(chunk_size=8 * 1024 * 1024):
+    sha.update(chunk)
+    part = s3.upload_part(Body=chunk, PartNumber=part_num, ...)
+    parts.append({"PartNumber": part_num, "ETag": part["ETag"]})
+    part_num += 1
+s3.complete_multipart_upload(...)
+checksum = sha.hexdigest()
+```
+
+**Option 2 — Pre-signed S3 URL:**
+The API issues a pre-signed URL; the client uploads directly to S3. The API
+never touches the file bytes at all — zero memory overhead regardless of size.
+Best for very large files, but requires the client to implement the upload.
+
+### For CSV / tabular data (the interview case)
+
+**Loading all rows:** `pd.read_csv("large.csv")` — fine for thousands of rows,
+OOM for millions.
+
+**Option 1 — Pandas chunking:**
+```python
+for chunk in pd.read_csv("large.csv", chunksize=10_000):
+    process(chunk)  # only 10k rows in RAM at a time
+```
+Memory stays constant at one chunk. Works for aggregations, filters, transforms.
+Does not work if you need to sort or join across the whole dataset.
+
+**Option 2 — DuckDB (query without loading):**
+```python
+import duckdb
+result = duckdb.query("SELECT gene, COUNT(*) FROM 'large.csv' GROUP BY gene").df()
+```
+DuckDB streams the file and executes the query without loading it. Only the
+result comes into memory. Fast, no cluster needed, handles GB-scale files
+on a laptop.
+
+**Option 3 — Polars lazy evaluation:**
+```python
+import polars as pl
+result = pl.scan_csv("large.csv").filter(pl.col("status") == "active").collect()
+```
+`scan_csv` builds a query plan; `collect()` executes it with streaming.
+Similar to DuckDB, only the result materialises.
+
+**Option 4 — Spark (distributed):**
+Split the file across many machines; each processes its partition.
+Right when the data is genuinely too large for one machine even with streaming
+— typically 100 GB+. Covered in p3.
+
+**Rule of thumb:** streaming/chunking first (no new infrastructure), DuckDB/Polars
+for analytical queries (fast and simple), Spark only when data is larger than
+one machine can stream sequentially in acceptable time.
 
 ---
 
