@@ -30,6 +30,38 @@ life science domain — where queries mix technical identifiers with natural lan
 
 ---
 
+## Corpus and chunking
+
+The corpus is PubMed abstracts fetched via the PubMed E-utilities API and stored
+in ChromaDB.
+
+**What is a chunk?**
+Rather than indexing each abstract as one unit, the text is split into overlapping
+pieces — chunks. Each chunk is indexed and searched independently. This matters
+because a 250-word abstract embedded as one vector may score well for the overall
+topic but poorly for a specific claim buried in the third sentence. Chunking lets
+the retriever surface the exact passage relevant to the query, not just the abstract
+as a whole.
+
+**Parameters:**
+
+| Parameter | Value | Reason |
+|-----------|-------|--------|
+| Chunk size | 512 characters | ~80-100 words — enough context for a claim to be self-contained |
+| Overlap | 64 characters | Prevents entity mentions at boundaries from being split across chunks |
+
+Larger chunks (1024+) dilute the embedding; smaller chunks (256) lose context
+for technical claims that span multiple sentences.
+
+**Chunk identity:** each chunk is identified by `sha256(text)[:16]` scoped to
+its source document. This is used during RRF fusion to recognise when BM25 and
+dense search return the same chunk, so their scores are combined rather than
+counted twice. A text prefix (`text[:64]`) was used initially but caused silent
+deduplication when two chunks from the same source shared the same opening
+characters — one result was silently dropped. A full-text hash is collision-safe.
+
+---
+
 ## The retrieval pipeline
 
 ```
@@ -104,15 +136,18 @@ the resource cost for a CPU-only deployment.
 
 ## Reciprocal Rank Fusion (RRF)
 
-After BM25 and dense retrieval each return a ranked list of 20 candidates, the
-two lists are merged using RRF:
+After BM25 and dense retrieval each return a ranked list of 20 chunks, the two
+lists are merged using RRF. Because the same chunk can appear in both lists (see
+[Corpus and chunking](#corpus-and-chunking) for how chunks are identified), RRF
+combines their scores rather than listing the chunk twice.
 
 ```
 RRF(d) = Σ 1 / (k + rank_i(d))
 ```
 
-Where `rank_i(d)` is the rank of document d in list i, and k=60 is a constant
-that reduces the impact of very high ranks.
+Where `rank_i(d)` is the rank of chunk d in list i, and k=60 is a constant
+that reduces the impact of very high ranks (from the original RRF paper,
+Cormack et al. 2009).
 
 **Why RRF instead of score normalisation:**
 BM25 scores and cosine similarities are on different scales and cannot be directly
@@ -122,14 +157,14 @@ differences and consistently outperforms score normalisation in empirical benchm
 
 **Example:**
 
-| Document | BM25 rank | Dense rank | RRF score |
-|----------|-----------|------------|-----------|
+| Chunk | BM25 rank | Dense rank | RRF score |
+|-------|-----------|------------|-----------|
 | A | 1 | 3 | 1/61 + 1/63 = 0.0321 |
 | B | 5 | 1 | 1/65 + 1/61 = 0.0318 |
 | C | 2 | 8 | 1/62 + 1/68 = 0.0309 |
 
-Document A ranks first in BM25 and third in dense — RRF gives it the highest
-combined score. A document that ranks well in both systems consistently gets
+Chunk A ranks first in BM25 and third in dense — RRF gives it the highest
+combined score. A chunk that ranks well in both systems consistently gets
 promoted to the top of the fused list.
 
 ---
@@ -186,23 +221,3 @@ covers the dominant cases correctly.
 
 The classifier is biased toward the slow path for borderline cases — the
 quality cost of under-retrieving is higher than the latency cost of over-computing.
-
----
-
-## Corpus and ingestion
-
-The corpus is PubMed abstracts fetched via the PubMed E-utilities API, stored
-in ChromaDB as 512-character chunks with 64-character overlap. The overlap
-ensures entity mentions at chunk boundaries are not split.
-
-**Why chunk abstracts rather than index whole abstracts:**
-A 250-word abstract embedded as one vector may score well for the topic but
-poorly for a specific claim buried in the third sentence. Chunking allows the
-retriever to surface the specific passage relevant to the query, not just the
-abstract as a whole.
-
-**Chunk size trade-off:**
-512 characters (~80-100 words) captures enough context to make a claim
-self-contained while remaining small enough that the embedding is specific.
-Larger chunks (1024+) dilute the embedding; smaller chunks (256) lose context
-for technical claims that span multiple sentences.
