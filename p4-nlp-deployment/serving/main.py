@@ -5,6 +5,7 @@ log = setup_logging()
 
 import asyncio
 import os
+import re
 import time
 from contextlib import asynccontextmanager
 
@@ -16,6 +17,12 @@ from prometheus_client import Counter, Histogram, generate_latest
 from pydantic import BaseModel
 from starlette.responses import PlainTextResponse
 from transformers import DistilBertForSequenceClassification, DistilBertTokenizerFast
+
+# Sentence boundary regex — splits on .!? followed by whitespace + capital letter.
+# Handles most PubMed RCT prose correctly. Does not handle all abbreviations
+# (e.g. "Dr. Smith" would split) — for production, replace with nltk.sent_tokenize
+# with the punkt_tab model. See docs/implementation.md §Sentence splitting.
+_SENT_RE = re.compile(r'(?<=[.!?])\s+(?=[A-Z])')
 
 # ---------------------------------------------------------------------------
 # Label mapping — must match training LABEL2ID
@@ -40,10 +47,20 @@ try:
         "nlp_request_latency_ms", "Predict latency ms",
         buckets=[10, 25, 50, 100, 200, 500, 1000],
     )
+    MODEL_LOAD_DURATION = Histogram(
+        "nlp_model_load_duration_seconds", "Total model load time at startup",
+        buckets=[5, 10, 30, 60, 120, 300],
+    )
+    RGW_DOWNLOAD_LATENCY = Histogram(
+        "nlp_rgw_download_latency_seconds", "S3/RGW download latency per file",
+        buckets=[0.5, 1, 2, 5, 10, 30],
+    )
 except ValueError:
     from prometheus_client import REGISTRY
     REQUEST_TOTAL = REGISTRY._names_to_collectors.get("nlp_requests_total")
     REQUEST_LATENCY = REGISTRY._names_to_collectors.get("nlp_request_latency_ms")
+    MODEL_LOAD_DURATION = REGISTRY._names_to_collectors.get("nlp_model_load_duration_seconds")
+    RGW_DOWNLOAD_LATENCY = REGISTRY._names_to_collectors.get("nlp_rgw_download_latency_seconds")
 
 # ---------------------------------------------------------------------------
 # Lifespan — load model from RGW once at startup
@@ -52,33 +69,51 @@ _state: dict = {}
 
 
 def _load_model() -> tuple:
+    t_start = time.monotonic()
     rgw = os.environ["RGW_ENDPOINT"]
     bucket = os.environ.get("MODEL_BUCKET", "nlp-models")
     prefix = os.environ.get("MODEL_PREFIX", "pubmed-rct/v1")
 
-    s3 = boto3.client(
-        "s3",
-        endpoint_url=rgw,
-        aws_access_key_id=os.environ["RGW_ACCESS_KEY"],
-        aws_secret_access_key=os.environ["RGW_SECRET_KEY"],
-        config=Config(signature_version="s3v4"),
-    )
+    try:
+        s3 = boto3.client(
+            "s3",
+            endpoint_url=rgw,
+            aws_access_key_id=os.environ["RGW_ACCESS_KEY"],
+            aws_secret_access_key=os.environ["RGW_SECRET_KEY"],
+            config=Config(signature_version="s3v4"),
+        )
 
-    local_dir = "/tmp/model"
-    os.makedirs(local_dir, exist_ok=True)
+        local_dir = "/tmp/model"
+        os.makedirs(local_dir, exist_ok=True)
 
-    paginator = s3.get_paginator("list_objects_v2")
-    for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
-        for obj in page.get("Contents", []):
-            key = obj["Key"]
-            fname = os.path.basename(key)
-            local_path = os.path.join(local_dir, fname)
-            if not os.path.exists(local_path):
-                s3.download_file(bucket, key, local_path)
+        paginator = s3.get_paginator("list_objects_v2")
+        for page in paginator.paginate(Bucket=bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                key = obj["Key"]
+                fname = os.path.basename(key)
+                local_path = os.path.join(local_dir, fname)
+                if not os.path.exists(local_path):
+                    t_dl = time.monotonic()
+                    s3.download_file(bucket, key, local_path)
+                    RGW_DOWNLOAD_LATENCY.observe(time.monotonic() - t_dl)
+                    log.info("rgw_file_downloaded", extra={"key": key})
+
+    except Exception as exc:
+        log.error("model_load_failed", extra={
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc),
+            "rgw_endpoint": rgw,
+            "bucket": bucket,
+            "prefix": prefix,
+        })
+        raise
 
     tokenizer = DistilBertTokenizerFast.from_pretrained(local_dir)
     model = DistilBertForSequenceClassification.from_pretrained(local_dir)
     model.eval()
+
+    MODEL_LOAD_DURATION.observe(time.monotonic() - t_start)
+    log.info("model_loaded", extra={"duration_s": round(time.monotonic() - t_start, 1)})
     return tokenizer, model
 
 
@@ -107,7 +142,7 @@ class PredictRequest(BaseModel):
 class SentenceResult(BaseModel):
     text: str
     label: str
-    confidence: float
+    confidence: float  # raw softmax output — not a calibrated probability; see docs/implementation.md §Confidence
     colour: str
 
 
@@ -160,7 +195,7 @@ async def predict(req: PredictRequest):
     start = time.monotonic()
     loop = asyncio.get_event_loop()
 
-    sentences = [s.strip() for s in req.text.split(".") if s.strip()]
+    sentences = [s.strip() for s in _SENT_RE.split(req.text) if s.strip()]
     if not sentences:
         raise HTTPException(status_code=422, detail="No sentences found in input")
 

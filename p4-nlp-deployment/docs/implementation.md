@@ -28,6 +28,64 @@ This document describes how the project was built: structure chosen, problems hi
 - Workaround: push to HuggingFace Hub from Kaggle → pull to laptop → push to RGW (s3://nlp-models/pubmed-rct/v1/)
 - HF token stored in pass homelab/huggingface/kaggle-token
 
+---
+
+## serving/main.py — post-review fixes (2026-05-27)
+
+### Sentence splitting
+
+**Problem:** `req.text.split(".")` splits on every period — including decimals
+(`2.5 mg/kg` → `["2", "5 mg/kg"]`), abbreviations (`Dr. Smith` → `["Dr", "Smith"]`),
+and p-values (`p < 0.05` → `["p < 0", "05"]`). Each fragment is classified
+independently, producing nonsense labels.
+
+**Fix:** regex `(?<=[.!?])\s+(?=[A-Z])` — splits on sentence-ending punctuation
+followed by whitespace and a capital letter. Handles 95%+ of PubMed RCT prose
+correctly because scientific sentences reliably start with a capital letter.
+
+**Production consideration:** `nltk.sent_tokenize` with the `punkt_tab` model
+handles edge cases (abbreviations, initialisms) correctly and is the standard
+for biomedical text. Requires adding `nltk` to requirements and downloading the
+model at image build time (~13 MB). Worth doing if the API is extended to
+handle arbitrary clinical notes rather than structured abstracts.
+
+### Confidence scores
+
+The `confidence` field in `SentenceResult` is the raw softmax probability of
+the predicted class — not a calibrated probability. "confidence: 0.97" means
+the logit for this class was much higher than the others; it does not mean
+the model is correct 97% of the time.
+
+**What calibration means:** a calibrated model with confidence 0.8 is correct
+~80% of the time. An uncalibrated softmax can be systematically overconfident
+(outputs near 1.0 even when uncertain) or underconfident depending on the
+training distribution.
+
+**Production fix:** fit temperature scaling on the validation set. Divide logits
+by a scalar T before softmax; T is chosen to minimise NLL on held-out data.
+~30 lines of code. See `docs/model-limitations.md §3`.
+
+**Current state:** documented in the schema comment and in `docs/model-limitations.md`.
+Callers should not treat the confidence value as a true probability.
+
+### Boto3 error handling in _load_model()
+
+**Problem:** if RGW is unreachable at startup (wrong endpoint, missing credentials,
+network partition), boto3 raises an exception that propagates through the FastAPI
+lifespan with no log output. The pod CrashLoopBackOff with no useful diagnostic.
+
+**Fix:** wrapped the S3 block in try/except. On failure, logs `model_load_failed`
+with endpoint, bucket, prefix, exception type, and message — then re-raises so
+the pod still fails fast (correct behaviour) but now with a useful log entry.
+
+### Prometheus metrics added
+
+Two new histograms:
+- `nlp_model_load_duration_seconds` — total startup time from entering `_load_model()`
+  to model ready. Useful for tuning `readinessProbe.initialDelaySeconds`.
+- `nlp_rgw_download_latency_seconds` — per-file S3 download time. Signals RGW
+  performance degradation independently of model load time.
+
 ### Results
 - accuracy=86.8%, macro F1=0.806
 - Per-class F1: METHODS=0.937, RESULTS=0.915, CONCLUSIONS=0.833, BACKGROUND=0.706, OBJECTIVE=0.640
