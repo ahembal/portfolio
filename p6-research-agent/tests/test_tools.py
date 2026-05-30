@@ -146,32 +146,34 @@ class TestUniprotLookup:
 # ---------------------------------------------------------------------------
 
 class TestVectorStore:
-    def test_index_and_search(self, tmp_path):
+    def test_index_and_search(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CHROMADB_DIR", str(tmp_path))
         from src.tools.vector_store import index, search
 
         docs = [
             {"text": "TP53 is a tumour suppressor gene frequently mutated in cancer.", "source": "doc1"},
             {"text": "SciLifeLab provides genomics infrastructure for Swedish researchers.", "source": "doc2"},
         ]
-        n = index(docs, persist_dir=str(tmp_path))
+        n = index(docs)
         assert n >= 2
 
-        # Call underlying function directly — persist_dir is not an LLM-facing arg
-        results = search.func(query="tumour suppressor", k=2, persist_dir=str(tmp_path))
+        results = search.func(query="tumour suppressor", k=2)
         assert isinstance(results, list)
         assert len(results) >= 1
         assert "text" in results[0]
         assert "score" in results[0]
         assert "TP53" in results[0]["text"] or "tumour" in results[0]["text"].lower()
 
-    def test_search_empty_corpus_returns_empty(self, tmp_path):
+    def test_search_empty_corpus_returns_empty(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CHROMADB_DIR", str(tmp_path / "empty"))
         from src.tools.vector_store import search
-        results = search.func(query="anything", k=3, persist_dir=str(tmp_path / "empty"))
+        results = search.func(query="anything", k=3)
         assert results == []
 
-    def test_index_deduplicates_on_reindex(self, tmp_path):
+    def test_index_deduplicates_on_reindex(self, tmp_path, monkeypatch):
+        monkeypatch.setenv("CHROMADB_DIR", str(tmp_path))
         from src.tools.vector_store import index
         docs = [{"text": "Same document indexed twice.", "source": "dup"}]
-        n1 = index(docs, persist_dir=str(tmp_path))
-        n2 = index(docs, persist_dir=str(tmp_path))
+        n1 = index(docs)
+        n2 = index(docs)
         assert n1 == n2

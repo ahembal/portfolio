@@ -1,8 +1,3 @@
-from logging_config import setup_logging
-from middleware import RequestLoggingMiddleware
-
-log = setup_logging()
-
 import asyncio
 import os
 import re
@@ -13,10 +8,14 @@ import boto3
 import torch
 from botocore.client import Config
 from fastapi import FastAPI, HTTPException
+from logging_config import setup_logging
+from middleware import RequestLoggingMiddleware
 from prometheus_client import Counter, Histogram, generate_latest
 from pydantic import BaseModel
 from starlette.responses import PlainTextResponse
 from transformers import DistilBertForSequenceClassification, DistilBertTokenizerFast
+
+log = setup_logging()
 
 # Sentence boundary regex — splits on .!? followed by whitespace + capital letter.
 # Handles most PubMed RCT prose correctly. Does not handle all abbreviations
@@ -59,8 +58,12 @@ except ValueError:
     from prometheus_client import REGISTRY
     REQUEST_TOTAL = REGISTRY._names_to_collectors.get("nlp_requests_total")
     REQUEST_LATENCY = REGISTRY._names_to_collectors.get("nlp_request_latency_ms")
-    MODEL_LOAD_DURATION = REGISTRY._names_to_collectors.get("nlp_model_load_duration_seconds")
-    RGW_DOWNLOAD_LATENCY = REGISTRY._names_to_collectors.get("nlp_rgw_download_latency_seconds")
+    MODEL_LOAD_DURATION = REGISTRY._names_to_collectors.get(
+        "nlp_model_load_duration_seconds"
+    )
+    RGW_DOWNLOAD_LATENCY = REGISTRY._names_to_collectors.get(
+        "nlp_rgw_download_latency_seconds"
+    )
 
 # ---------------------------------------------------------------------------
 # Lifespan — load model from RGW once at startup
@@ -68,7 +71,10 @@ except ValueError:
 _state: dict[str, object] = {}
 
 
-def _load_model() -> tuple["DistilBertTokenizerFast", "DistilBertForSequenceClassification"]:
+_ModelPair = tuple["DistilBertTokenizerFast", "DistilBertForSequenceClassification"]
+
+
+def _load_model() -> _ModelPair:
     t_start = time.monotonic()
     rgw = os.environ["RGW_ENDPOINT"]
     bucket = os.environ.get("MODEL_BUCKET", "nlp-models")
@@ -142,7 +148,7 @@ class PredictRequest(BaseModel):
 class SentenceResult(BaseModel):
     text: str
     label: str
-    confidence: float  # raw softmax output — not a calibrated probability; see docs/implementation.md §Confidence
+    confidence: float  # raw softmax — uncalibrated; see docs/implementation.md
     colour: str
 
 

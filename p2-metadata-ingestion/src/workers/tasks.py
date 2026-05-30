@@ -24,13 +24,12 @@ import time
 
 import magic
 from celery import Celery
-from src.logging_config import setup_logging
 from prometheus_client import Counter, Histogram
 from sqlalchemy import create_engine
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
-from sqlalchemy.engine import make_url
-
+from src.logging_config import setup_logging
 from src.storage.db import FileMetadata
 from src.storage.s3 import (
     RGWConfig,
@@ -79,7 +78,9 @@ def _sync_db_url() -> str:
     # make_url handles percent-encoded special chars in passwords correctly;
     # a naive .replace() on the raw URL string would not.
     url = make_url(os.environ["DATABASE_URL"])
-    return url.set(drivername="postgresql+psycopg2").render_as_string(hide_password=False)
+    return url.set(
+        drivername="postgresql+psycopg2"
+    ).render_as_string(hide_password=False)
 
 
 _sync_engine = None
@@ -159,7 +160,10 @@ def process_file(
 
         JOB_DURATION.observe(time.perf_counter() - t0)
         JOB_STATUS_TOTAL.labels(status="done").inc()
-        log.info("file_processing_done", extra={"job_id": job_id, "duration_ms": round((time.perf_counter() - t0) * 1000, 1)})
+        log.info("file_processing_done", extra={
+            "job_id": job_id,
+            "duration_ms": round((time.perf_counter() - t0) * 1000, 1),
+        })
         return {"status": "done", "job_id": job_id}
 
     except Exception as exc:
@@ -171,14 +175,21 @@ def process_file(
                 full_msg = str(exc)
                 record.error_msg = full_msg[:500]
                 if len(full_msg) > 500:
-                    log.warning("error_msg_truncated", extra={"job_id": job_id, "full_length": len(full_msg)})
+                    log.warning("error_msg_truncated", extra={
+                        "job_id": job_id,
+                        "full_length": len(full_msg),
+                    })
                 session.commit()
         except Exception:
             pass
 
         JOB_DURATION.observe(time.perf_counter() - t0)
         JOB_STATUS_TOTAL.labels(status="failed").inc()
-        log.error("file_processing_failed", extra={"job_id": job_id, "exception_type": type(exc).__name__, "exception_message": str(exc)[:200]})
+        log.error("file_processing_failed", extra={
+            "job_id": job_id,
+            "exception_type": type(exc).__name__,
+            "exception_message": str(exc)[:200],
+        })
         # Exponential backoff: 30s, 60s, 120s.
         raise self.retry(exc=exc, countdown=30 * (2 ** self.request.retries))
 

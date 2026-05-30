@@ -44,13 +44,14 @@ from src.api.schemas import (
     IngestResponse,
     JobStatus,
 )
+from src.logging_config import setup_logging
+from src.middleware import RequestLoggingMiddleware
 from src.storage.db import (
     FileMetadata,
     create_tables,
     get_engine,
     get_session_factory,
 )
-from src.workers.tasks import process_file
 from src.storage.s3 import (
     RGWConfig,
     build_s3_key,
@@ -59,8 +60,7 @@ from src.storage.s3 import (
     get_storage_config,
     upload_bytes,
 )
-from src.logging_config import setup_logging
-from src.middleware import RequestLoggingMiddleware
+from src.workers.tasks import process_file
 
 log = setup_logging()
 
@@ -122,7 +122,8 @@ app.add_middleware(RequestLoggingMiddleware)
 # ---------------------------------------------------------------------------
 
 
-MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(100 * 1024 * 1024)))  # 100 MB default
+_100_MB = 100 * 1024 * 1024
+MAX_UPLOAD_BYTES = int(os.environ.get("MAX_UPLOAD_BYTES", str(_100_MB)))
 
 
 @app.post("/ingest", response_model=IngestResponse, status_code=202)

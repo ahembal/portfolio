@@ -32,17 +32,17 @@ Design principles:
 
 import io
 import os
-import sys
 import time
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
-from pathlib import Path
 
 import timm
 import torch
 import torch.nn as nn
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse, Response
+from logging_config import setup_logging
+from middleware import RequestLoggingMiddleware
 from PIL import Image
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
@@ -52,9 +52,6 @@ from prometheus_client import (
     Info,
     generate_latest,
 )
-
-from logging_config import setup_logging
-from middleware import RequestLoggingMiddleware
 
 log = setup_logging()
 
