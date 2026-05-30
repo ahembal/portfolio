@@ -61,6 +61,34 @@ but it is a consistent, reproducible signal that tracks relative improvement.
 
 ---
 
+## Self-evaluation bias
+
+A well-known failure mode: if the same model generates the answer *and* judges
+it, scores are inflated. The model tends to score its own outputs higher because:
+
+- It recognises its own phrasing and style as "correct"
+- It filled gaps in the retrieved context during generation; the judge sees
+  a fluent answer and doesn't notice the gap that was silently papered over
+- The judge and generator share the same knowledge biases
+
+This is documented in the MT-Bench paper (Zheng et al. 2023), which showed
+GPT-4 systematically preferred GPT-4-generated answers over equally good human
+answers when used as a judge.
+
+**What this means in practice:** the generator and judge should be different
+systems. In p7:
+- The **generator** is the p6 research agent — a separate service with its
+  own tool-calling pipeline, system prompt, and Ollama instance
+- The **judge** is a standalone LLM call with a scoring prompt
+
+When running without the p6 agent (e.g. in CI), the inline fallback generator
+uses the same model as the judge — this is documented as a limitation in
+`src/evaluation/runner.py`. The scores from the inline fallback are useful for
+tracking relative changes but should not be compared to scores produced with
+the real agent.
+
+---
+
 ## The three core metrics
 
 These are the de facto standard metrics for RAG evaluation, used by RAGAS,

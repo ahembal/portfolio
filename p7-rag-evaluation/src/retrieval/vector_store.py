@@ -20,6 +20,8 @@ CHUNK_OVERLAP = 64
 
 def _persist_dir() -> str:
     # Read at call time so CHROMADB_DIR can be overridden in tests via env var.
+    # Default /tmp is not persistent across pod restarts. In k8s, mount a PVC
+    # and set CHROMADB_DIR to the mount path (e.g. /data/chromadb).
     return os.getenv("CHROMADB_DIR", "/tmp/p7-chromadb")
 
 

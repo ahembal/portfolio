@@ -1,6 +1,5 @@
 """Tests for LLM-as-judge scorer."""
 
-from unittest.mock import MagicMock
 from src.evaluation.judge import (
     score_context_relevance,
     score_faithfulness,
@@ -13,13 +12,20 @@ CHUNKS = ["TP53 is a tumour suppressor gene.", "TP53 regulates apoptosis and cel
 ANSWER = "TP53 is a tumour suppressor that regulates apoptosis."
 
 
-def _mock_llm(response: str) -> MagicMock:
-    """Mock LLM that returns a fixed string — no Ollama server needed."""
-    msg = MagicMock()
-    msg.content = response
-    llm = MagicMock()
-    llm.invoke.return_value = msg
-    return llm
+def _mock_llm(response: str):
+    """Mock LLM as a plain callable — matches the (prompt: str) -> str interface."""
+    return lambda prompt: response
+
+
+def _mock_llm_sequence(*responses: str):
+    """Mock LLM that cycles through a sequence of responses — one per call."""
+    responses = list(responses)
+    calls = [0]
+    def call(prompt: str) -> str:
+        r = responses[calls[0] % len(responses)]
+        calls[0] += 1
+        return r
+    return call
 
 
 class TestContextRelevance:
@@ -71,13 +77,11 @@ class TestEvaluate:
         assert set(scores.keys()) == {"context_relevance", "faithfulness", "answer_relevance"}
 
     def test_scores_in_range(self):
-        # Each metric makes a separate LLM call — side_effect cycles through responses
-        llm = MagicMock()
-        llm.invoke.side_effect = [
-            MagicMock(content='{"relevant": 1, "total": 2}'),
-            MagicMock(content='{"supported": 3, "total": 4}'),
-            MagicMock(content='{"score": 0.7}'),
-        ]
+        llm = _mock_llm_sequence(
+            '{"relevant": 1, "total": 2}',
+            '{"supported": 3, "total": 4}',
+            '{"score": 0.7}',
+        )
         scores = evaluate(QUERY, CHUNKS, ANSWER, llm)
         for v in scores.values():
             assert -1.0 <= v <= 1.0

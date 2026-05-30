@@ -9,25 +9,51 @@ Scores three metrics per query:
 Each score is 0.0–1.0. The judge LLM is called once per metric per query.
 Scores are probabilities estimated by the judge, not ground truth.
 
-The judge LLM is configurable — defaults to Ollama (local, no API key needed).
-Any LLM can be substituted by passing a different `llm` argument.
+LLM interface
+-------------
+All functions accept `llm` as a plain callable: (prompt: str) -> str.
+This keeps the judge independent of any specific LLM library. To use a
+LangChain LLM, wrap it with the provided adapter:
+
+    from src.evaluation.judge import langchain_adapter
+    from langchain_ollama import ChatOllama
+
+    llm = langchain_adapter(ChatOllama(model="llama3.1:8b", base_url="..."))
+    evaluate(query, chunks, answer, llm)
+
+Any other callable works too — an OpenAI client, Anthropic SDK, or a mock:
+
+    llm = lambda prompt: "0.8"  # mock for tests
 """
 
 import json
 import re
 
 
+def langchain_adapter(langchain_llm):
+    """Wrap a LangChain LLM as a plain callable(prompt: str) -> str."""
+    from langchain_core.messages import HumanMessage
+    def call(prompt: str) -> str:
+        return langchain_llm.invoke([HumanMessage(content=prompt)]).content
+    return call
+
+
 def _parse_score(text: str) -> float:
-    """Extract a 0.0–1.0 score from judge output. Returns -1.0 if unparseable."""
-    match = re.search(r"\b([01](?:\.\d+)?)\b", text)
+    """Extract a 0.0–1.0 score from judge output. Returns -1.0 if unparseable.
+
+    Prefers decimal fractions (0.xxx, 1.0) over bare integers to avoid
+    extracting a partial match from a longer number (e.g. "1" in "10.5").
+    """
+    match = re.search(r"\b(0\.\d+|1\.0+)\b", text)
+    if not match:
+        match = re.search(r"\b([01])\b", text)
     if match:
         return min(1.0, max(0.0, float(match.group(1))))
     return -1.0
 
 
 def _call(llm, prompt: str) -> str:
-    from langchain_core.messages import HumanMessage
-    return llm.invoke([HumanMessage(content=prompt)]).content
+    return llm(prompt)
 
 
 def score_context_relevance(query: str, chunks: list[str], llm) -> float:
@@ -127,7 +153,7 @@ def evaluate(
         query:  the original question
         chunks: retrieved passages passed to the LLM
         answer: the generated answer
-        llm:    LangChain-compatible LLM instance
+        llm:    callable(prompt: str) -> str — use langchain_adapter() for LangChain LLMs
 
     Returns:
         dict with keys: context_relevance, faithfulness, answer_relevance (all float 0–1)
