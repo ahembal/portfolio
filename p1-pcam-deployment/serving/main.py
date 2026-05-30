@@ -97,8 +97,10 @@ try:
         # Buckets tuned for CPU inference: p50 ~20 ms, p99 ~200 ms.
         buckets=[5, 10, 25, 50, 100, 200, 500, 1000, 2000],
     )
-except ValueError:
-    # Already registered — happens when the module is re-imported in tests.
+except ValueError as e:
+    if "already been registered" not in str(e):
+        raise
+    # Duplicate registration — happens when the module is re-imported in tests.
     REQUEST_COUNT = REGISTRY._names_to_collectors.get("pcam_requests_total")
     REQUEST_LATENCY = REGISTRY._names_to_collectors.get("pcam_request_latency_ms")
 

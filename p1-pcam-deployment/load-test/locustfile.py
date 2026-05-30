@@ -57,11 +57,17 @@ class PcamUser(HttpUser):
 
     @task
     def predict(self) -> None:
-        self.client.post(
+        resp = self.client.post(
             "/predict",
             files={"file": ("patch.png", io.BytesIO(_PATCH_PNG), "image/png")},
             name="/predict",
         )
+        if resp.status_code == 200:
+            body = resp.json()
+            if body.get("label") not in ("tumour", "normal"):
+                resp.failure(f"Unexpected label: {body.get('label')}")
+            if not (0.0 <= body.get("confidence", -1) <= 1.0):
+                resp.failure(f"Confidence out of range: {body.get('confidence')}")
 
     @task(1)
     def health(self) -> None:

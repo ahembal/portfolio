@@ -135,6 +135,67 @@ class TestPredictEndpoint:
         assert resp.status_code == 503
 
 
+class TestMetricsEndpoint:
+    def test_metrics_returns_200(self, client):
+        """GET /metrics should return 200 with Prometheus text format."""
+        resp = client.get("/metrics")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"].startswith("text/plain")
+
+    def test_metrics_contains_expected_counters(self, client):
+        """After a predict call, /metrics must expose pcam_requests_total."""
+        client.post(
+            "/predict",
+            files={"file": ("patch.jpg", _make_jpeg_bytes(), "image/jpeg")},
+        )
+        resp = client.get("/metrics")
+        body = resp.text
+        assert "pcam_requests_total" in body
+        assert "pcam_request_latency_ms" in body
+
+    def test_metrics_prometheus_text_format(self, client):
+        """Prometheus text format lines must start with a metric name or #."""
+        resp = client.get("/metrics")
+        for line in resp.text.splitlines():
+            if line:
+                assert line.startswith("#") or line[0].isalpha(), (
+                    f"Unexpected line format: {line!r}"
+                )
+
+
+class TestRGWIntegration:
+    """
+    Integration test scaffold for the S3/RGW model-loading path.
+
+    These tests are skipped by default — they require a live Ceph RGW instance
+    and the RGW_ENDPOINT / RGW_ACCESS_KEY / RGW_SECRET_KEY env vars to be set.
+    Run with: pytest tests/ -m rgw
+
+    Why skip rather than mock?
+    The RGW path (boto3 → Ceph S3 API → object download) has enough real
+    behaviour (presigned URLs, multipart, content-type negotiation) that mocks
+    give false confidence. These tests are meant to run in staging, not in CI.
+    """
+
+    @pytest.mark.skipif(
+        not all(k in __import__("os").environ for k in ("RGW_ENDPOINT", "RGW_ACCESS_KEY", "RGW_SECRET_KEY")),
+        reason="RGW env vars not set — skipping RGW integration tests",
+    )
+    def test_load_model_from_rgw(self):
+        """Model loads successfully from a real RGW bucket."""
+        import os
+        from serving.main import ServingConfig, load_model
+        cfg = ServingConfig(
+            bucket=os.environ.get("MODEL_BUCKET", "pcam-models"),
+            model_key=os.environ.get("MODEL_KEY", "resnet18-pcam/best_model.pt"),
+            rgw_endpoint=os.environ["RGW_ENDPOINT"],
+            rgw_access_key=os.environ["RGW_ACCESS_KEY"],
+            rgw_secret_key=os.environ["RGW_SECRET_KEY"],
+        )
+        model = load_model(cfg)
+        assert model is not None
+
+
 class TestPreprocessing:
     def test_output_shape(self):
         """preprocess() should return a (1, 3, 96, 96) tensor."""
