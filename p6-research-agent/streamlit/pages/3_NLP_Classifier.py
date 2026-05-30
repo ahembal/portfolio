@@ -74,7 +74,7 @@ if st.button("Classify", disabled=not abstract.strip()):
             f'<span style="background-color:{colour};color:white;padding:1px 6px;'
             f'border-radius:3px;font-size:0.75em;margin-right:8px">{s["label"]}</span>'
             f'<span style="font-size:0.85em;color:#111">{s["text"]}</span>'
-            f'<span style="float:right;color:#666;font-size:0.75em">{s["confidence"]:.0%}</span>'
+            f'<span style="float:right;color:#666;font-size:0.75em">{s["confidence"]:.1%}</span>'
             f'</div>',
             unsafe_allow_html=True,
         )

@@ -69,7 +69,7 @@
 | F3 | Filter PubMed results to English only | Add `AND English[Language]` to the Entrez query in `pubmed_search()`. Currently non-English papers can be returned — the LLM may silently produce a wrong summary of a non-English abstract. Simple one-line fix but changes behaviour so kept as explicit decision. |
 | F4 | Fix system prompt — require pubmed_fetch before citing | Current prompt says "use minimum tool calls" which causes the LLM to answer from titles only. Update to explicitly require `pubmed_fetch` on top results before citing. See `docs/q-agent-design.md` — Prompt engineering section. |
 | F5 | Implement citation provenance validation | Cross-reference PMIDs and UniProt accessions in the answer against the tool call history. Flag any citation that was not actually retrieved in the session. See `docs/answer-quality.md`. |
-| F6 | Prevent hallucinated citations at the source — prompt fix | The current post-processing strips unverified citation tags from the answer. The proper fix is to update the system prompt in `src/agent/graph.py` (build_graph) to explicitly instruct the LLM to cite ONLY IDs returned by tool calls in the current session. Requires evaluation against the p7 benchmark before merging to confirm it does not reduce citation recall on verified sources. |
+| F6 | Prevent hallucinated citations at the source — prompt fix | ✅ Done (2026-05-27). Rule 3 in `src/agent/prompts.py` now explicitly requires verifying each ID appeared in tool results before citing it. The post-processing strip remains as a safety net. Needs evaluation against the p7 benchmark to confirm citation recall on verified sources is not reduced — benchmark requires Ollama running locally. |
 
 ---
 

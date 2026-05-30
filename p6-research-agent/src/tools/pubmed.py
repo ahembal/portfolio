@@ -18,6 +18,7 @@ at https://pubmed.ncbi.nlm.nih.gov/<pmid>/ — this is what makes
 agent citations trustworthy and verifiable.
 """
 
+import os
 import time
 
 from Bio import Entrez, Medline
@@ -26,7 +27,7 @@ from pydantic import BaseModel, Field, field_validator
 
 ENTREZ_EMAIL = "emre.balsever@scilifelab.se"
 ENTREZ_TOOL  = "p6-research-agent"
-REQUEST_DELAY = 0.35   # seconds between requests — stays under 3/s limit
+REQUEST_DELAY = float(os.getenv("PUBMED_REQUEST_DELAY", "0.35"))  # default: 3 req/s limit
 
 
 def _configure():

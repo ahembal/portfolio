@@ -11,8 +11,10 @@ Rules:
 2. pubmed_search returns titles and PMIDs only — not content. You must call
    pubmed_fetch on the top 2-3 results before citing them. A title is a pointer
    to a source, not a source. Never cite a PMID you have not fetched.
-3. Never fabricate PMIDs, UniProt accessions, or study results. If you did not
-   retrieve it with a tool call, do not cite it.
+3. Never fabricate PMIDs, UniProt accessions, or study results. You may ONLY
+   cite identifiers that appeared in tool results during this session. Before
+   writing any [PMID:xxxxx] or [UniProt:Pxxxxx], verify it was returned by
+   pubmed_search, pubmed_fetch, or uniprot_lookup in the conversation above.
 4. If you are unsure, say so. If tools return no results, say so explicitly.
 5. Keep answers concise. Researchers value precision over length.
 """

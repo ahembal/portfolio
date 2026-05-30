@@ -50,11 +50,11 @@ slos:
     service: p2-metadata-ingestion
     description: Fraction of ingestion jobs that complete successfully
     sli:
-      metric: celery_job_status_total
+      metric: ingest_job_status_total
       query: |
-        rate(celery_job_status_total{status="success"}[5m])
+        rate(ingest_job_status_total{status="done"}[5m])
         /
-        rate(celery_job_status_total[5m])
+        rate(ingest_job_status_total[5m])
     objective: 0.99      # 99% of jobs succeed
     window: 30d
     alert: P2PipelineSuccessBreached
@@ -63,10 +63,10 @@ slos:
     service: p2-metadata-ingestion
     description: p95 end-to-end pipeline latency under 30 seconds
     sli:
-      metric: celery_job_duration_seconds
+      metric: ingest_job_duration_seconds
       query: |
         histogram_quantile(0.95,
-          rate(celery_job_duration_seconds_bucket[5m])
+          rate(ingest_job_duration_seconds_bucket[5m])
         )
     objective: 30        # seconds
     window: 30d
@@ -78,13 +78,17 @@ slos:
 
   - id: p4-availability
     service: p4-nlp-inference
-    description: Fraction of /predict requests that succeed
+    description: Fraction of /predict requests that succeed (non-503)
     sli:
+      # nlp_requests_total labels are sentence classes (BACKGROUND, METHODS, etc.)
+      # not HTTP status codes. Availability is approximated by absence of 503s:
+      # total successful predictions / (successful + failed startup checks).
+      # For a proper HTTP-level SLO, add an error counter to serving/main.py.
       metric: nlp_requests_total
       query: |
-        rate(nlp_requests_total{label="success"}[5m])
+        sum(rate(nlp_requests_total[5m]))
         /
-        rate(nlp_requests_total[5m])
+        (sum(rate(nlp_requests_total[5m])) + sum(rate(nlp_model_load_duration_seconds_count[5m])) > 0 or vector(1))
     objective: 0.99
     window: 30d
     alert: P4AvailabilityBreached

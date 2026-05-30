@@ -2,7 +2,7 @@ from pydantic import BaseModel, Field
 
 
 class QueryRequest(BaseModel):
-    question: str
+    question: str = Field(min_length=1, max_length=2000)
     max_steps: int = Field(default=10, ge=1, le=30)
 
 
