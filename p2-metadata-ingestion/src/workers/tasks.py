@@ -168,7 +168,10 @@ def process_file(
             record = session.get(FileMetadata, job_id)
             if record:
                 record.status = "failed"
-                record.error_msg = str(exc)[:500]
+                full_msg = str(exc)
+                record.error_msg = full_msg[:500]
+                if len(full_msg) > 500:
+                    log.warning("error_msg_truncated", extra={"job_id": job_id, "full_length": len(full_msg)})
                 session.commit()
         except Exception:
             pass

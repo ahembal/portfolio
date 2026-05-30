@@ -1,5 +1,12 @@
 # In-cluster Postgres StatefulSet + Service + PVC.
 # Uses Ceph RBD StorageClass for persistent storage.
+#
+# DEV / HOMELAB ONLY. Not suitable for production:
+# - single replica (no HA, no streaming replication)
+# - no automated backup or PITR
+# - password in a K8s Secret (not an external vault)
+# In production, replace with a managed Postgres service (RDS, CloudSQL, etc.)
+# and point DATABASE_URL at it.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
