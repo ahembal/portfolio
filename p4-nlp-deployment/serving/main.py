@@ -65,10 +65,10 @@ except ValueError:
 # ---------------------------------------------------------------------------
 # Lifespan — load model from RGW once at startup
 # ---------------------------------------------------------------------------
-_state: dict = {}
+_state: dict[str, object] = {}
 
 
-def _load_model() -> tuple:
+def _load_model() -> tuple["DistilBertTokenizerFast", "DistilBertForSequenceClassification"]:
     t_start = time.monotonic()
     rgw = os.environ["RGW_ENDPOINT"]
     bucket = os.environ.get("MODEL_BUCKET", "nlp-models")

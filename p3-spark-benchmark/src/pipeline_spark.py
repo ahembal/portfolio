@@ -34,7 +34,8 @@ def run_pipeline(data_path: str, lookup_path: str, out_dir: str,
     t = time.perf_counter()
     df = spark.read.parquet(data_path)
     # nanosAsLong converts TIMESTAMP(NANOS) → BIGINT; convert back to timestamp.
-    # TODO(F3): remove once data is re-fetched with microsecond precision.
+    # SRA dump uses nanosecond precision; Spark reads it as bigint.
+    # Workaround stays until source data is re-fetched at microsecond resolution.
     if dict(df.dtypes).get("Published") == "bigint":
         df = df.withColumn("Published", (F.col("Published") / 1e9).cast("timestamp"))
     lookup = spark.read.parquet(lookup_path)

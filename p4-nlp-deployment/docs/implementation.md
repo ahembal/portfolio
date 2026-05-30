@@ -90,3 +90,28 @@ Two new histograms:
 - accuracy=86.8%, macro F1=0.806
 - Per-class F1: METHODS=0.937, RESULTS=0.915, CONCLUSIONS=0.833, BACKGROUND=0.706, OBJECTIVE=0.640
 - Within expected DistilBERT range (86-88% on PubMed RCT)
+
+---
+
+## Known model limitations
+
+### OBJECTIVE class misclassification
+
+OBJECTIVE has the lowest per-class F1 (0.640). Sentences like *"Objective: We
+evaluated..."* are frequently classified as BACKGROUND (~54% confidence). This
+is a training data imbalance issue — OBJECTIVE sentences are rare in PubMed RCT
+abstracts and often share vocabulary with BACKGROUND (study context, disease
+framing). It is not a code bug.
+
+The fix requires retraining with oversampled OBJECTIVE examples or a class-weighted
+loss function. For the portfolio deployment this limitation is accepted and
+documented.
+
+### CONCLUSIONS / RESULTS confusion
+
+Short conclusion sentences that present quantitative outcomes ("X reduced Y by Z%")
+are sometimes classified as RESULTS rather than CONCLUSIONS. Both classes share
+result-reporting language; the distinction is positional (CONCLUSIONS appear last
+and draw inferences). The model learns this only weakly from surface text alone.
+
+Again, a training data or architecture issue — not addressable without retraining.

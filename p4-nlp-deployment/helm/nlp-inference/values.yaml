@@ -3,7 +3,8 @@ namespace: nlp-inference
 api:
   image:
     repository: ghcr.io/ahembal/nlp-inference-api
-    tag: a30be8724c3e70b64be0ab5a8fffd785f85fb130   # replaced by CI with full SHA
+    tag: a30be8724c3e70b64be0ab5a8fffd785f85fb130   # replaced by CI with short SHA
+  nodePort: 30640
   replicas: 1
   resources:
     requests:
