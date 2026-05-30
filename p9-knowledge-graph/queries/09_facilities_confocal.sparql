@@ -1,0 +1,15 @@
+-- Facilities offering confocal microscopy.
+-- Basic graph traversal: Technique → p9:offeredBy → Facility → Institution.
+
+SELECT ?facName ?city ?institution WHERE {
+  ?technique  a            p9:Technique ;
+              schema:name  ?techName ;
+              p9:offeredBy ?facility .
+  ?facility   a                       p9:Facility ;
+              schema:name             ?facName ;
+              schema:addressLocality  ?city ;
+              schema:parentOrganization ?inst .
+  ?inst       schema:name             ?institution .
+  FILTER(CONTAINS(LCASE(STR(?techName)), "confocal"))
+}
+ORDER BY ?institution ?facName

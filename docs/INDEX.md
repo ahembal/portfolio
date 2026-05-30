@@ -16,6 +16,7 @@
 | p7 — RAG Evaluation | [how-it-works.md](../p7-rag-evaluation/docs/how-it-works.md) |
 | p8 — Model Registry | [how-it-works.md](../p8-model-registry/docs/how-it-works.md) |
 | p9 — Knowledge Graph | [how-it-works.md](../p9-knowledge-graph/docs/how-it-works.md) |
+| p11 — AI Browser | [how-it-works.md](../p11-ai-browser/docs/how-it-works.md) |
 
 ---
 
@@ -47,10 +48,13 @@ Serving trained models in production — FastAPI, Docker, Kubernetes, autoscalin
 How LLM agents and retrieval systems are built, evaluated, and grounded.
 
 - [p6 — Agent design rationale](../p6-research-agent/docs/q-agent-design.md) — why LangGraph, tool design, SSE streaming, prompt engineering, FAIR data
+- [p11 — AI Browser how-it-works](../p11-ai-browser/docs/how-it-works.md) — Electron shell, companion panel, SSE relay to p6
+- [p11 — AI Browser design decisions](../p11-ai-browser/docs/design-decisions.md) — why proxy to p6, shared Ollama, httpx vs Playwright, Electron vs extension
+- [p11 — AI Browser tools](../p11-ai-browser/docs/tools.md) — fetch_page_text and research_client reference
 - [p6 — Answer quality & provenance](../p6-research-agent/docs/answer-quality.md) — what hallucination checking does and does not catch
 - [p6 — Tools](../p6-research-agent/docs/tools.md) — PubMed, UniProt, ChromaDB tool implementations
 - [p7 — Retrieval design](../p7-rag-evaluation/docs/retrieval-design.md) — BM25 vs dense retrieval, RRF fusion, reranking
-- [p7 — Evaluation design](../p7-rag-evaluation/docs/evaluation-design.md) — LLM-as-judge methodology, benchmark construction
+- [p7 — Evaluation design](../p7-rag-evaluation/docs/evaluation-design.md) — LLM-as-judge methodology, self-evaluation bias, benchmark construction
 - [p9 — RAG vs knowledge graph comparison](../p9-knowledge-graph/docs/comparison.md) — when structured queries beat vector search
 
 ---

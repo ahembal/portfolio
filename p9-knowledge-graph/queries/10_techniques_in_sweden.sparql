@@ -1,0 +1,14 @@
+-- Imaging techniques available in Sweden.
+-- Multi-hop: Technique → p9:offeredBy → Facility → schema:parentOrganization
+--            → Institution → schema:addressCountry = "SE"
+
+SELECT DISTINCT ?techniqueName ?facName ?city WHERE {
+  ?institution  a                      p9:Institution ;
+                schema:addressCountry  "SE" .
+  ?facility     schema:parentOrganization  ?institution ;
+                schema:name                ?facName ;
+                schema:addressLocality     ?city .
+  ?technique    p9:offeredBy               ?facility ;
+                schema:name                ?techniqueName .
+}
+ORDER BY ?techniqueName ?facName

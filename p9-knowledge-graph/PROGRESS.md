@@ -48,13 +48,13 @@
 | 16 | graphrag.py | ✅ Done | `src/graphrag.py` — SPARQL context (papers, co-mentions, function annotations, diseases) + p7 vector retrieval + LLM synthesis. Prompt engineered across 3 iterations; documented in `docs/graphrag-prompt-engineering.md`. |
 | 17 | Extend benchmark | ✅ Done | 10 hybrid questions added to `src/benchmark.py` (total: 30). `docs/comparison.md` updated with GraphRAG section. |
 
-## Phase 7 — Imaging facilities domain (planned)
+## Phase 7 — Imaging facilities domain
 | # | Step | Status | What & Why |
 |---|------|--------|------------|
-| 18 | Schema extension | ⬜ Planned | Add Facility, Technique, SampleType, AccessCondition classes. |
-| 19 | Seed data | ⬜ Planned | Synthetic imaging facility data. 15–20 facilities. |
-| 20 | EDAM alignment | ⬜ Planned | Map imaging techniques to EDAM operation terms. |
-| 21 | SPARQL examples | ⬜ Planned | Multi-hop queries across facility/technique/access graph. |
+| 18 | Schema extension | ✅ Done | Added Institution, Initiative, Facility, Technique classes. `p9:nodeOf`, `p9:offeredBy`, `p9:accessType` properties. Spec in `docs/phase7-facilities-spec.md`. |
+| 19 | Seed data | ✅ Done | 12 real Euro-BioImaging nodes, 10 institutions, 9 techniques. Source: public eurobioimaging.eu listings. `src/facilities_seed.py` + builder in `src/facilities_builder.py`. Outputs `data/seed/facilities.ttl`. |
+| 20 | EDAM alignment | ✅ Done | Each Technique gets `edam:has_topic` directly in the builder (topic_3382 light microscopy, topic_0611 EM, topic_1317 cryo-EM, topic_3383 correlative, topic_3372 image analysis, topic_3384 biomedical imaging, topic_2229 cell biology, topic_3383 CLEM). |
+| 21 | SPARQL examples | ✅ Done | Queries 09–13 in `queries/`. Query 13 is the cross-domain join: Phase 1–6 paper EDAM topics joined with Phase 7 technique EDAM topics — demonstrates why one triplestore beats two. |
 
 ---
 
@@ -67,7 +67,7 @@ Phase 3  [██████] 6/6 ✅
 Phase 4  [███]  3/3 — Complete (sparql.py + 8 queries + 20 benchmark questions)
 Phase 5  [██]   2/2 — Complete
 Phase 6  [██]   2/2 — Complete (GraphRAG)
-Phase 7  [░░░░] 0/4 — Planned (Imaging facilities)
+Phase 7  [████] 4/4 — Complete (Imaging facilities)
 ```
 
 ## How to run
@@ -76,8 +76,9 @@ Phase 7  [░░░░] 0/4 — Planned (Imaging facilities)
 # 1. Install dependencies
 pip install -r requirements.txt
 
-# 2. Build the knowledge graph (takes ~5–10 min, hits PubMed + UniProt)
-python src/builder.py
+# 2. Build the knowledge graphs
+python src/builder.py            # Phase 1–6: proteins + papers (~5–10 min, hits PubMed + UniProt)
+python src/facilities_builder.py # Phase 7: imaging facilities (static seed, fast)
 
 # 3. Deploy Fuseki on the cluster
 helm upgrade --install p9 helm/ \

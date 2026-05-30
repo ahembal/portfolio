@@ -1,0 +1,23 @@
+-- Cross-domain join: EDAM topics shared by the paper graph (Phase 1–6)
+-- and the facilities graph (Phase 7).
+--
+-- This query is the primary motivation for keeping both layers in one
+-- triplestore. Two separate systems cannot execute this join without a
+-- federation layer or manual data export.
+--
+-- Read as: "which imaging techniques are relevant to the biomedical research
+-- topics that appear in the protein-paper literature?"
+
+SELECT DISTINCT ?edamTopic ?techniqueName ?paperTitle WHERE {
+  -- Phase 1–6: papers aligned to EDAM topics via keyword matching in aligner.py
+  ?paper      a              p9:Paper ;
+              schema:name    ?paperTitle ;
+              edam:has_topic ?edamTopic .
+
+  -- Phase 7: techniques with the same EDAM topic
+  ?technique  edam:has_topic  ?edamTopic ;
+              schema:name     ?techniqueName ;
+              p9:offeredBy    ?facility .
+}
+ORDER BY ?edamTopic ?techniqueName
+LIMIT 20

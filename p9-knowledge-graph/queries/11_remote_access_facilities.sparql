@@ -1,0 +1,13 @@
+-- Facilities offering remote or hybrid access.
+-- Property filter on p9:accessType; covers REMOTE and BOTH values.
+
+SELECT ?facName ?city ?institution ?accessType WHERE {
+  ?facility  a                       p9:Facility ;
+             schema:name             ?facName ;
+             schema:addressLocality  ?city ;
+             p9:accessType           ?accessType ;
+             schema:parentOrganization ?inst .
+  ?inst      schema:name             ?institution .
+  FILTER(?accessType IN ("REMOTE", "BOTH"))
+}
+ORDER BY ?institution ?facName

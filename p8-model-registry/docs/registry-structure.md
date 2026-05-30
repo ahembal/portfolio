@@ -159,3 +159,10 @@ understanding the capabilities:
 
 - **No UI** — a CLI (`src/cli.py`) is the interface. Production teams need
   dashboards showing which models are deployed, when evaluations expire, etc.
+
+- **No schema migration path** — if a required field is added or renamed, all
+  existing YAML entries must be updated manually. A production system would use
+  a schema version field and a migration script. Current approach: bump
+  `schemas/*.schema.yaml`, run `python src/validate.py` to find all entries
+  that break, and update them before merging. Document the change in a
+  `CHANGELOG.md` entry with the affected field names.

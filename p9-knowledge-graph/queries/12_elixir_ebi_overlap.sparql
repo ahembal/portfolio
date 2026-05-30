@@ -1,0 +1,17 @@
+-- Institutions whose facilities are nodes of both ELIXIR and Euro-BioImaging.
+-- Demonstrates multi-initiative membership: one facility, two p9:nodeOf edges.
+
+SELECT DISTINCT ?institution ?country WHERE {
+  ?ebi     a            p9:Initiative ;
+           schema:name  "Euro-BioImaging" .
+  ?elixir  a            p9:Initiative ;
+           schema:name  "ELIXIR" .
+
+  ?facility  p9:nodeOf                  ?ebi ;
+             p9:nodeOf                  ?elixir ;
+             schema:parentOrganization  ?inst .
+
+  ?inst  schema:name            ?institution ;
+         schema:addressCountry  ?country .
+}
+ORDER BY ?country ?institution
