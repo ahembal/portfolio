@@ -120,6 +120,14 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE }}:${{ github.sha }}
+          format: table
+          exit-code: '0'
+          severity: CRITICAL,HIGH
+
       - name: Update image tag in values.yaml
         # Write the new SHA into values.yaml and commit it back to main.
         # ArgoCD watches this file — when it changes, ArgoCD detects drift

@@ -21,6 +21,7 @@ independent but they share the same infrastructure and engineering patterns.
 | p8 | [Model Registry](p8-model-registry/) | Model provenance, packaging (HuggingFace, ONNX), serving format benchmark — downstream of training | 🔄 In progress |
 | p9 | [Knowledge Graph](p9-knowledge-graph/) | RDF/OWL knowledge graph, SPARQL endpoint, ontology alignment, GraphRAG vs RAG comparison | ⬜ Planned |
 | p10 | [Model Training](p10-model-training/) | Training pipeline, experiment tracking, evaluation, Grand Challenge submission — upstream of p8 | ⬜ Planned |
+| p11 | [AI Browser](p11-ai-browser/) | Electron developer browser with AI companions; Research companion delegates to p6 | 🔄 Foundation |
 
 ---
 
@@ -46,6 +47,8 @@ Agents
 ──────────────
 p6: LLM (Llama 3.1 8B via Ollama) + LangGraph + PubMed + UniProt + RAG
     (shows what sits on top of the serving infrastructure)
+p11 (p11-ai-browser/): Electron AI browser — Docs Navigator + GitHub companions (local LangGraph)
+     Research companion proxies to p6 (shared Ollama, no duplication)
 
 Cross-cutting (p5 documents all of the above)
 ──────────────
