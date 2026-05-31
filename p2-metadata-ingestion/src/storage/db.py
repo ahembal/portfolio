@@ -59,7 +59,9 @@ def get_engine(database_url: str | None = None):
     url = database_url or os.environ["DATABASE_URL"]
     pool_size = int(os.environ.get("DB_POOL_SIZE", "10"))
     max_overflow = int(os.environ.get("DB_MAX_OVERFLOW", "20"))
-    return create_async_engine(url, pool_pre_ping=True, pool_size=pool_size, max_overflow=max_overflow)
+    return create_async_engine(
+        url, pool_pre_ping=True, pool_size=pool_size, max_overflow=max_overflow
+    )
 
 
 def get_session_factory(engine) -> async_sessionmaker[AsyncSession]:
