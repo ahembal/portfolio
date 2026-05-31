@@ -83,10 +83,12 @@ PubMed and UniProt tests mock all HTTP — `Entrez.esearch`, `Entrez.read`,
 `Entrez.efetch`, `Medline.parse`, and `requests.get` are all patched.
 `time.sleep` is also patched so tests run instantly.
 
-Vector store tests use a real ChromaDB instance in `tmp_path` — no mocking.
-This is intentional: the embedding pipeline (tokenise → encode → cosine
-similarity) cannot be meaningfully mocked, and a mock would not catch the
-most likely failure modes (model not loading, ChromaDB API changes).
+Vector store tests use `chromadb.EphemeralClient()` patched via `_get_client` —
+no server required, but the real embedding pipeline (tokenise → encode → cosine
+similarity) still runs. This is intentional: a mock would not catch the most
+likely failure modes (model not loading, ChromaDB API changes). The fixture
+deletes the collection before each test because `EphemeralClient` shares
+in-process state across instances. See `docs/deployment-troubleshooting.md §12`.
 
 **Problem hit:** `pytest-asyncio` was not needed here (all tools are
 synchronous), but `pyproject.toml` needed `pythonpath = ["."]` so `src.*`

@@ -72,12 +72,17 @@ larger model or a GPU-backed embedding service.
 
 ## ChromaDB as vector store
 
-**Decision:** ChromaDB persistent client on a ceph-rbd PVC (5Gi)
+**Decision:** ChromaDB HTTP server as a separate container, accessed via `HttpClient`
 
 ChromaDB was chosen over alternatives (Pinecone, Weaviate, Qdrant) because it
 runs locally with no external service dependency and integrates with
 sentence-transformers directly. For a homelab portfolio project where simplicity
 and self-containment matter, it is the right choice.
 
+Originally used `PersistentClient` writing directly to a ceph-rbd PVC — this
+caused SQLite corruption when the `chromadb` server container mounted the same
+volume concurrently (see `deployment-troubleshooting.md §12`). Switched to a
+dedicated `chromadb` container running the HTTP server, accessed via `HttpClient`.
+The chromadb container owns the PVC exclusively, eliminating the corruption risk.
 The PVC ensures the indexed corpus survives pod restarts — rebuilding embeddings
 for the full corpus takes several minutes and would be wasteful on every restart.

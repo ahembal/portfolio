@@ -2,8 +2,8 @@
 *Last updated: 2026-05-03*
 
 All external API calls (PubMed, UniProt) are mocked — tests run without
-network access. The vector store tests use a temporary directory so they
-don't affect the real corpus.
+network access. The vector store tests patch `_get_client` to return a
+`chromadb.EphemeralClient()` so they run without a ChromaDB server.
 
 ---
 
@@ -15,7 +15,7 @@ Tests are split into two tiers:
 ```bash
 pytest tests/ -v -m "not e2e"
 ```
-No external dependencies. PubMed and UniProt calls are mocked. ChromaDB uses a temporary directory. The agent graph routing tests replace tool functions with `MagicMock`. These tests run in seconds on any machine without Ollama or network access.
+No external dependencies. PubMed and UniProt calls are mocked. ChromaDB uses `EphemeralClient` — no server required. The agent graph routing tests replace tool functions with `MagicMock`. These tests run in seconds on any machine without Ollama or network access.
 
 **E2E tests** (run manually against a real deployment):
 ```bash
@@ -128,6 +128,13 @@ always receive a dict from every tool.
 ---
 
 ## Vector store
+
+**ChromaDB isolation note:** `chromadb.EphemeralClient()` connects to a
+shared in-process server — multiple instances within the same test session
+share state. The `chroma_client` fixture deletes the `research_corpus`
+collection before each test to ensure a clean starting state. This is a
+chromadb design choice (ephemeral clients behave like `HttpClient` against
+an in-process server, not like independent file stores).
 
 ### test_index_and_search
 **Type:** Integration (uses real ChromaDB + real model, no network)

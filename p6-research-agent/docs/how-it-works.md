@@ -268,8 +268,11 @@ a detailed description of SciLifeLab's genomics infrastructure is not on PubMed.
 - Quality depends on what was indexed. An empty corpus returns nothing useful.
 - Similarity search is semantic (meaning-based) not keyword-based — a very
   specific query may match unexpected documents.
-- ChromaDB persists to disk on a PVC. If the PVC is lost, the corpus must be
-  rebuilt.
+- ChromaDB runs as a separate container and owns its PVC exclusively. The API
+  container communicates over HTTP (`HttpClient`) — it does not mount the
+  volume directly. If the PVC is lost, the corpus must be rebuilt (the seed
+  corpus is re-indexed automatically on startup; custom documents must be
+  re-indexed manually).
 
 ---
 

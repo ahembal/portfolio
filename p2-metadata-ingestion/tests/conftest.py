@@ -14,8 +14,7 @@ Strategy:
   (middleware, lifespan, dependency injection) without a real HTTP server.
 """
 
-import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 import pytest_asyncio

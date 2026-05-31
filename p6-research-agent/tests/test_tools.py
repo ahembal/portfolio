@@ -3,6 +3,8 @@ Tests for p6 tools — PubMed, UniProt, vector store.
 All external HTTP calls are mocked — no network required.
 """
 
+import chromadb
+import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -146,8 +148,16 @@ class TestUniprotLookup:
 # ---------------------------------------------------------------------------
 
 class TestVectorStore:
-    def test_index_and_search(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("CHROMADB_DIR", str(tmp_path))
+    @pytest.fixture(autouse=True)
+    def chroma_client(self, monkeypatch):
+        client = chromadb.EphemeralClient()
+        try:
+            client.delete_collection("research_corpus")
+        except Exception:
+            pass
+        monkeypatch.setattr("src.tools.vector_store._get_client", lambda: client)
+
+    def test_index_and_search(self):
         from src.tools.vector_store import index, search
 
         docs = [
@@ -164,14 +174,12 @@ class TestVectorStore:
         assert "score" in results[0]
         assert "TP53" in results[0]["text"] or "tumour" in results[0]["text"].lower()
 
-    def test_search_empty_corpus_returns_empty(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("CHROMADB_DIR", str(tmp_path / "empty"))
+    def test_search_empty_corpus_returns_empty(self):
         from src.tools.vector_store import search
         results = search.func(query="anything", k=3)
         assert results == []
 
-    def test_index_deduplicates_on_reindex(self, tmp_path, monkeypatch):
-        monkeypatch.setenv("CHROMADB_DIR", str(tmp_path))
+    def test_index_deduplicates_on_reindex(self):
         from src.tools.vector_store import index
         docs = [{"text": "Same document indexed twice.", "source": "dup"}]
         n1 = index(docs)

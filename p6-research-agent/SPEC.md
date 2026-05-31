@@ -39,7 +39,7 @@ this is a concrete demonstration of why FAIR data infrastructure matters for AI.
 |-----------|--------|-----|
 | Agent framework | LangGraph (LangChain) | Graph-based agent: explicit control flow, easy to add tools, observable step-by-step reasoning. LangGraph over plain LangChain because it makes the agent loop explicit rather than hidden in a ReAct string parser. |
 | LLM backbone | Llama 3.1 8B via Ollama (local) | Runs on the homelab cluster (CPU inference, ~10 s/query — acceptable for research assistant use). No API key, no cost, no data leaving the network. Can swap to GPT-4o or Claude via a config flag. |
-| Embeddings + vector store | sentence-transformers + ChromaDB | Local RAG over a small life science document corpus (e.g., SciLifeLab platform descriptions, PubMed abstracts). ChromaDB persists to disk, no external dependency. |
+| Embeddings + vector store | sentence-transformers + ChromaDB | Local RAG over a small life science document corpus (e.g., SciLifeLab platform descriptions, PubMed abstracts). ChromaDB runs as a separate HTTP server container; the API communicates via `HttpClient`. |
 | Tool: PubMed | Biopython Entrez API | Search and fetch abstracts by query or PMID. NCBI Entrez is the standard programmatic interface to PubMed — rate-limited, no auth required. |
 | Tool: UniProt | UniProt REST API | Look up protein by name, gene symbol, or accession. Returns canonical sequence, domains, disease associations, organism. Free, well-documented, stable identifiers. |
 | Tool: vector store | ChromaDB (local) | RAG retrieval over the local corpus. When PubMed/UniProt don't have enough context, the agent falls back to the local store. |

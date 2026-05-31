@@ -198,6 +198,14 @@ tool useless. Added `src/seed.py` which indexes `data/seed_corpus.json` (10
 curated protein summaries + SciLifeLab context) at API startup if the collection
 is empty. This runs automatically — no manual indexing step required.
 
+**Test isolation consequence:** Switching from `PersistentClient` to `HttpClient`
+broke the vector store tests — they used `monkeypatch.setenv("CHROMADB_DIR", ...)`
+which `HttpClient` never reads. Additionally, `chromadb.EphemeralClient()` (used
+in tests as a server-free alternative) shares in-process state across instances —
+multiple calls to `EphemeralClient()` in the same test session connect to the same
+in-memory server. Tests now patch `_get_client` directly and explicitly delete the
+collection before each test to ensure isolation. See `docs/testing.md §Vector store`.
+
 ---
 
 ## 11. OOMKilled during corpus ingestion

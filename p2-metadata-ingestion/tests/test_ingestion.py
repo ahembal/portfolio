@@ -16,8 +16,6 @@ import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
-import pytest_asyncio
-from sqlalchemy import select
 
 from src.storage.db import FileMetadata
 
