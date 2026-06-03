@@ -1,0 +1,24 @@
+# p13 — Baseline fine-tuning configuration.
+# All hyperparameters defined here. Source code contains no magic numbers.
+
+experiment: pubmed-rct
+
+model_name: distilbert-base-uncased
+
+lora:
+  rank: 16        # Number of adapter dimensions. Higher rank = more capacity.
+  alpha: 32       # Scaling factor. Convention: alpha = 2 × rank.
+  dropout: 0.1
+
+data:
+  feature_store_path: s3://pipeline-features/pubmed/
+  max_length: 128  # Covers >99% of PubMed RCT sentences without truncation.
+
+training:
+  output_dir: /tmp/p13-output
+  num_train_epochs: 10
+  per_device_train_batch_size: 32
+  per_device_eval_batch_size: 64
+  learning_rate: 2.0e-4
+  weight_decay: 0.01
+  fp16: true       # ROCm fp16 on Dardel MI250X. Set false for CPU development runs.

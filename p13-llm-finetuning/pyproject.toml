@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "p13-llm-finetuning"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "transformers>=4.40",
+    "peft>=0.10",
+    "accelerate>=0.29",
+    "datasets>=2.19",
+    "optuna>=3.6",
+    "mlflow>=2.12",
+    "scikit-learn>=1.4",
+    "pandas>=2.2",
+    "pyarrow>=15.0",
+    "s3fs>=2024.3",
+    "pyyaml>=6.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "--tb=short"
