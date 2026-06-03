@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ai-browser
+description: AI Developer Browser — backend agent service
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

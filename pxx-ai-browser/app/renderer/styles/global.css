@@ -1,0 +1,17 @@
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg: #1a1a1e;
+  --surface: #26262c;
+  --surface2: #2e2e36;
+  --border: #38383f;
+  --accent: #7c6af7;
+  --accent-dim: #5a50c4;
+  --text: #e8e8f0;
+  --text-dim: #9090a8;
+  --radius: 6px;
+  --tab-h: 36px;
+  --toolbar-h: 40px;
+}
+
+html, body, #root { height: 100%; overflow: hidden; background: var(--bg); color: var(--text); font-family: system-ui, sans-serif; font-size: 13px; }

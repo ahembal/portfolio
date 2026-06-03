@@ -1,0 +1,28 @@
+namespace: ai-browser
+
+backend:
+  image:
+    repository: ghcr.io/ahembal/ai-browser-backend
+    tag: latest  # replaced by CI with full SHA
+    pullPolicy: Always
+  replicas: 1
+  port: 8001
+  resources:
+    requests:
+      cpu: "250m"
+      memory: "512Mi"
+    limits:
+      cpu: "2"
+      memory: "4Gi"
+  env:
+    # p6 research agent — ClusterIP in research-agent namespace
+    P6_RESEARCH_AGENT_URL: "http://research-agent-api.research-agent.svc.cluster.local:8000"
+    # Shared Ollama instance from p6 — avoids running a second copy
+    OLLAMA_BASE_URL: "http://ollama.research-agent.svc.cluster.local:11434"
+    OLLAMA_MODEL: "llama3.1:8b"
+
+service:
+  type: ClusterIP
+  port: 8001
+  # NodePort for external access during development
+  nodePort: 30801
