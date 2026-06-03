@@ -62,7 +62,7 @@
 | R4 | Sync engine as module-level singleton | Creating `create_engine()` inside each task call opened a new pool per invocation; moved to module-level so connections are reused across tasks |
 | R5 | Exponential backoff on S3 retry | Fixed 30 s delay replaced with `30 * (2 ** retries)` — 30 s, 60 s, 120 s; avoids thundering herd when S3 recovers after an outage |
 | R6 | Sync DB URL via `make_url` | `str.replace()` on the raw URL is brittle if the password contains special characters; SQLAlchemy's `make_url` parses and reconstructs the URL correctly |
-| R7 | Large data / streaming section in q6-scalability.md | Documents chunked upload, pandas chunksize, DuckDB, Polars, and Spark options with interview-ready rule of thumb |
+| R7 | Large data / streaming section in q6-scalability.md | Documents chunked upload, pandas chunksize, DuckDB, Polars, and Spark options with rule of thumb |
 
 ## Quick status
 

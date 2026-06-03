@@ -124,7 +124,7 @@ aggregate upload throughput (~200 × 0.5 MB files/s or ~2 × 50 MB files/s).
 
 ## Handling large data without loading it all into memory
 
-This is a common interview question: *"What if the file was 1 GB? Or what if your CSV had millions of rows?"*
+A common question when reviewing this service: *"What if the file was 1 GB? Or what if your CSV had millions of rows?"*
 
 The underlying problem is the same in both cases: `file.read()` or `pd.read_csv()` loads everything into RAM at once. On a pod with 512 MB memory limit, a 600 MB file causes an OOM kill. The fix is to never hold the whole dataset in memory at once.
 
@@ -157,7 +157,7 @@ The API issues a pre-signed URL; the client uploads directly to S3. The API
 never touches the file bytes at all — zero memory overhead regardless of size.
 Best for very large files, but requires the client to implement the upload.
 
-### For CSV / tabular data (the interview case)
+### For CSV / tabular data
 
 **Loading all rows:** `pd.read_csv("large.csv")` — fine for thousands of rows,
 OOM for millions.
