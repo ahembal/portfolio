@@ -10,3 +10,4 @@
 | [EDPB GDPR research guidance](topics/edpb-gdpr-research-guidance.md) | raw | p5 + p9 | 2026-06-11 |
 | [p11 — Unified evaluation framework](topics/p11-unified-evaluation-framework.md) | raw | new project | 2026-06-11 |
 | [Cross-cutting docs](topics/cross-cutting-docs.md) | raw | repo root docs/ | 2026-06-11 |
+| [Format incompatibility as a systems pattern](topics/format-incompatibility-systems-pattern.md) | raw | p10 + p5 | 2026-06-13 |
