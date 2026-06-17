@@ -1,10 +1,12 @@
 apiVersion: batch/v1
 kind: Job
 metadata:
-  name: p8-benchmark-distilbert-pubmed-rct-v1-3
+  name: p8-benchmark-distilbert-pubmed-rct-v1-4
   namespace: default
 spec:
-  ttlSecondsAfterFinished: 3600
+  # TTL is set long enough to investigate a failure (24h) but still auto-cleans
+  # after success. A PrometheusRule alerts on failure so the window is sufficient.
+  ttlSecondsAfterFinished: 86400
   template:
     spec:
       nodeSelector:
@@ -23,32 +25,23 @@ spec:
             limits:
               cpu: "4000m"
               memory: "8Gi"
-          # RGW credentials — required for text model benchmarks that download
-          # weights from Ceph RGW. Vision models pull from HuggingFace Hub and
-          # do not need these. Set only when the model origin.type is "rgw".
-          #
-          # Create the secret before deploying:
-          #   kubectl create secret generic p8-benchmark-rgw-credentials \
-          #     --from-literal=endpoint=http://192.168.1.200 \
-          #     --from-literal=access-key=<KEY> \
-          #     --from-literal=secret-key=<SECRET>
           env:
             - name: RGW_ENDPOINT
               valueFrom:
                 secretKeyRef:
-                  name: p8-benchmark-distilbert-pubmed-rct-v1-3
+                  name: p8-benchmark-rgw-credentials
                   key: endpoint
                   optional: true
             - name: RGW_ACCESS_KEY
               valueFrom:
                 secretKeyRef:
-                  name: p8-benchmark-distilbert-pubmed-rct-v1-3
+                  name: p8-benchmark-rgw-credentials
                   key: access-key
                   optional: true
             - name: RGW_SECRET_KEY
               valueFrom:
                 secretKeyRef:
-                  name: p8-benchmark-distilbert-pubmed-rct-v1-3
+                  name: p8-benchmark-rgw-credentials
                   key: secret-key
                   optional: true
           volumeMounts:

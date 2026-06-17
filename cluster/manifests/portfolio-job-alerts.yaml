@@ -1,0 +1,49 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: portfolio-job-alerts
+  namespace: monitoring
+  labels:
+    release: kube-prom
+spec:
+  groups:
+    - name: job-alerts
+      rules:
+        # Fires when any portfolio batch Job exits with a failure condition.
+        # kube_job_failed is a kube-state-metrics gauge — value > 0 means the
+        # Job has at least one failed completion. The alert fires immediately
+        # (for: 0m) because Jobs do not flap; a failure is permanent until the
+        # Job is deleted or recreated.
+        - alert: PortfolioJobFailed
+          expr: |
+            kube_job_failed{namespace="default", job_name=~"p[0-9]+-.*"} > 0
+          for: 0m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Portfolio Job failed: {{ $labels.job_name }}"
+            description: >
+              Job {{ $labels.job_name }} in namespace {{ $labels.namespace }}
+              has failed. Check logs before TTL cleans up the pod (24h window):
+              kubectl logs -n {{ $labels.namespace }} -l job-name={{ $labels.job_name }}
+
+        # Fires when a portfolio Job has been running longer than 2 hours.
+        # Benchmark and builder jobs should complete in under 30 minutes.
+        # A stuck Job is usually a credential failure, OOM, or deadlock.
+        - alert: PortfolioJobStuck
+          expr: |
+            (
+              time() - kube_job_status_start_time{namespace="default", job_name=~"p[0-9]+-.*"}
+            ) > 7200
+            and
+            kube_job_complete{namespace="default", job_name=~"p[0-9]+-.*"} == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Portfolio Job stuck: {{ $labels.job_name }}"
+            description: >
+              Job {{ $labels.job_name }} has been running for more than 2 hours
+              without completing. Check for OOM, credential failures, or network
+              issues:
+              kubectl describe job -n {{ $labels.namespace }} {{ $labels.job_name }}
